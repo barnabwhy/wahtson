@@ -2,8 +2,8 @@ const { Client } = require('discord.js')
 const chalk = require('chalk')
 const open = require('open')
 
-const config = require('./config')
-const actions = require('./actions')
+const config = require('./config.js')
+const actions = require('./actions.js')
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 

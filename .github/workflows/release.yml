@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: '10.x'
+      - name: Install production dependencies
+        run: npm install --only=prod
+      - name: Install build dependencies
+        run: npm install --only=dev
+      - name: Build
+        run: npm run build
+      - name: Package
+        run: mv build wahtson && zip wahtson.zip wahtson/*
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: wahtson.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

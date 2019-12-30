@@ -5,8 +5,8 @@ const toml = require('toml')
 const open = require('open')
 const chalk = require('chalk')
 
-const CONFIG_TOML_PATH = path.join(__dirname, '..', 'config.toml')
-const CONFIG_EXAMPLE_PATH = path.join(__dirname, '..', 'config-example.toml')
+const CONFIG_TOML_PATH = './config.toml'
+const CONFIG_EXAMPLE_PATH = path.join(__dirname, '../config-example.toml')
 
 let cache, isWatching = false
 
