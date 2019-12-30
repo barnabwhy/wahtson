@@ -9,6 +9,7 @@ command_prefix = "!wah "
 # This command's actions are executed when an unknown command is issued (ie. not
 # defined in the 'commands' list.
 [unknown_command]
+
     [[unknown_command.actions]]
     type = "REPLY"
     text = "Unknown command."

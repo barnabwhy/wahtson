@@ -1,6 +1,6 @@
 {
   "name": "wahtson",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "src/bot.js",
   "bin": "src/bot.js",
   "dependencies": {
