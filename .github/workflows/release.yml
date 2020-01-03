@@ -14,7 +14,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v1
         with:
-          node-version: '8.x'
+          node-version: '12.x'
       - name: Install production dependencies
         run: npm install --only=prod
       - name: Install build dependencies

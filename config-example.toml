@@ -6,13 +6,33 @@ server_id = "413445781295464449"
 # When talking to the bot in DMs this is optional.
 command_prefix = "!wah "
 
-# This command's actions are executed when an unknown command is issued (ie. not
-# defined in the 'commands' list.
-[unknown_command]
+# These actions are executed when an unknown command is issued (ie. one not
+# defined in the 'commands' list).
+[[on_unknown_command]]
+type = "REPLY"
+text = "Unknown command."
 
-    [[unknown_command.actions]]
-    type = "REPLY"
-    text = "Unknown command."
+
+# These actions are executed when a new member joins the server.
+[[on_new_member]]
+type = "REPLY_DM"
+text = """
+Welcome to the server!
+"""
+
+
+[pin]
+emoji = ":pinthis:"
+count = 1
+disallow_from = [ "#pins" ]
+
+    [[pin.actions]]
+    type = "COPY_SOURCE_MESSAGE"
+    to = "#pins"
+
+    [[pin.actions]]
+    type = "REPLY_DM"
+    text = "Your message was pinned!"
 
 
 [[commands]]

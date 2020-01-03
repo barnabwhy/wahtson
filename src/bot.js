@@ -1,25 +1,34 @@
 const { Client } = require('discord.js')
 const chalk = require('chalk')
 const open = require('open')
+const sqlite = require('sqlite')
+const sql = require('sql-template-strings')
 
 const { version } = require('../package.json')
 const config = require('./config.js')
-const actions = require('./actions.js')
+const actionFunctions = require('./actions.js')
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const client = new Client()
-let guild
+let guild, db
 
-config.load().then(async () => {
-    config.get('bot_token', async token => {
-        await client.login(token)
-        return true
+config.load()
+    .then(() => sqlite.open('./database.sqlite', { Promise }))
+    .then(async _db => {
+        db = _db
+        await db.migrate()
     })
-}).catch(err => {
-    console.error(chalk.red(`error: ${err}`))
-    process.exit(1)
-})
+    .then(async () => {
+        config.get('bot_token', async token => {
+            await client.login(token)
+            return true
+        })
+    })
+    .catch(err => {
+        console.error(chalk.red(`error: ${err}`))
+        process.exit(1)
+    })
 
 client.once('ready', async () => {
     console.log(chalk.green('connected'))
@@ -52,40 +61,113 @@ client.on('message', async msg => {
     if (msg.guild && msg.guild.id !== guild.id) return
     if (msg.author.bot) return
 
-    const { commandString, commandConfig, args } = await parseMessage(msg)
+    const { commandAttempted, commandString, commandConfig, args } = await parseMessage(msg)
 
-    if (!commandConfig) return // Command not issued in message
+    if (!commandAttempted) return
 
-    const member = msg.member || guild.members.find(m => m.user.id === msg.author.id)
+    const member = msg.member || (await guild.fetchMember(msg.author))
 
     if (!member) return // Not a member of the server
 
     console.log(chalk.cyan(`@${member.displayName} issued command: ${msg.cleanContent}`))
 
-    const source = {
+    const actions = commandConfig
+        ? commandConfig.actions
+        : (await config.get('on_unknown_command'))
+    await executeActionChain(actions, {
         message: msg,
         channel: msg.channel,
         member: member,
+    })
+})
+
+client.on('guildMemberAdd', async member => {
+    if (!guild) return
+    if (member.guild.id !== guild.id) return
+
+    console.log(chalk.cyan(`@${member.displayName} joined`))
+
+    await executeActionChain(await config.get('on_new_member'), {
+        message: null,
+        channel: null,
+        member: member,
+    })
+})
+
+// Emit messageReactionAdd/Remove events even for uncached messages.
+client.on('raw', async packet => {
+    if (!['MESSAGE_REACTION_ADD', 'MESSAGE_REACTION_REMOVE'].includes(packet.t)) return;
+
+    const channel = client.channels.get(packet.d.channel_id)
+
+    // Cached message; event will fire anyway.
+    if (channel.messages.has(packet.d.message_id)) return
+
+    const message = await channel.fetchMessage(packet.d.message_id)
+    const emoji = packet.d.emoji.id ? `${packet.d.emoji.name}:${packet.d.emoji.id}` : packet.d.emoji.name
+
+    const reaction = message.reactions.get(emoji)
+    if (reaction) reaction.users.set(packet.d.user_id, client.users.get(packet.d.user_id))
+
+    if (packet.t === 'MESSAGE_REACTION_ADD') {
+        client.emit('messageReactionAdd', reaction, client.users.get(packet.d.user_id))
+    } else if (packet.t === 'MESSAGE_REACTION_REMOVE') {
+        client.emit('messageReactionRemove', reaction, client.users.get(packet.d.user_id))
+    }
+})
+
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (!guild) return
+    if (reaction.message.guild.id !== guild.id) return
+
+    const { emoji, count } = reaction
+
+    const pinConfig = await config.get('pin')
+    const opts = makeResolvable(pinConfig)
+
+    const { getChannel: getDisallowChannel } = makeResolvable(pinConfig.disallow_from)
+    for (let i = 0; i < pinConfig.disallow_from.length; i++) {
+        const channel = getDisallowChannel(0)
+
+        if (reaction.message.channel.id === channel.id) return
     }
 
-    for (let idx = 0; idx < commandConfig.actions.length; idx++) {
-        const action = commandConfig.actions[idx]
+    if (count >= opts.getNumber('count') && emoji.id === opts.getEmoji('emoji').id) {
+        const isPinned = !!(await db.get(sql`SELECT * FROM pins WHERE msgid=${reaction.message.id}`))
+
+        if (!isPinned) {
+            console.log(chalk.cyan(`pinning message`))
+
+            await db.run(sql`INSERT INTO pins VALUES (${reaction.message.id})`)
+
+            await executeActionChain(pinConfig.actions, {
+                message: reaction.message,
+                channel: reaction.message.channel,
+                member: await guild.fetchMember(user),
+            })
+        }
+    }
+})
+
+async function executeActionChain(actions, source) {
+    for (let idx = 0; idx < actions.length; idx++) {
+        const action = actions[idx]
 
         console.log(chalk.grey(` ${idx + 1}. ${action.type}`))
 
-        const fn = actions[action.type]
+        const fn = actionFunctions[action.type]
 
         if (!fn) {
             console.error(chalk.red(`error: unknown action type '${action.type}'`))
             continue
         }
 
-        await fn(source, await makeActionOpts(action))
+        await fn(source, makeResolvable(action))
             .catch(err => {
                 console.error(chalk.red(`error: ${err}`))
             })
     }
-})
+}
 
 async function parseMessage(msg) {
     const prefix = await config.get('command_prefix')
@@ -98,25 +180,26 @@ async function parseMessage(msg) {
         substring = msg.content
     } else {
         // Message is not a command.
-        return { command: null, args: null }
+        return { commandAttempted: false }
     }
 
     const [ commandString, ...rest ] = substring.split(' ')
     const argString = rest.join(' ')
 
     return {
-        commandString,
+        commandAttempted: true,
 
+        commandString,
         commandConfig: (await config.get('commands')).find(cmd => {
             const [ commandName ] = cmd.usage.split(' ') // TODO: parse properly
             return commandName === commandString
-        }) || (await config.get('unknown_command')),
+        }),
 
         args: argString.split(' '), // TODO: parse properly
     }
 }
 
-async function makeActionOpts(map) {
+function makeResolvable(map) {
     const resolveKey = key => {
         if (typeof map[key] === 'undefined') {
             throw `action option '${key}' is missing`
@@ -135,6 +218,10 @@ async function makeActionOpts(map) {
             return value
         },
 
+        getNumber(key) {
+            return +resolveKey(key)
+        },
+
         // Resolves to a Role by name or id.
         getRole(key) {
             const roleNameOrId = resolveKey(key)
@@ -147,6 +234,46 @@ async function makeActionOpts(map) {
             }
 
             return role
-        }
+        },
+
+        // Resolves to a TextChannel by #name or id (DM).
+        getChannel(key) {
+            const raw = resolveKey(key)
+
+            let channel
+            if (raw.startsWith('#')) {
+                // By name
+                const channelName = raw.substr(1)
+
+                channel = guild.channels.find(c => c.name === channelName)
+            } else {
+                // By ID
+                channel = guild.channels.find(c => c.id === raw)
+            }
+
+            if (!channel) {
+                throw `unable to resolve channel '${raw}'`
+            }
+
+            return channel
+        },
+
+        // Resolves to an Emoji by :name:. Enclosing colons are optional.
+        getEmoji(key) {
+            const maybeWithColons = resolveKey(key)
+            const withoutColons = maybeWithColons.startsWith(':')
+                ? maybeWithColons.substr(1, maybeWithColons.length - 2)
+                : maybeWithColons
+
+            const emoji = guild.emojis.find(emoji => {
+                return emoji.name === withoutColons
+            })
+
+            if (!emoji) {
+                throw `unable to resolve emoji '${maybeWithColons}'`
+            }
+
+            return emoji
+        },
     }
 }
