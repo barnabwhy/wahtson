@@ -47,22 +47,23 @@ client.once('ready', async () => {
 })
 
 client.on('message', async msg => {
-    if (msg.guild.id !== guild.id) {
-        return
-    }
+    if (msg.guild && msg.guild.id !== guild.id) return
+    if (msg.author.bot) return
 
     const { commandString, commandConfig, args } = await parseMessage(msg)
 
-    if (!commandConfig) {
-        return
-    }
+    if (!commandConfig) return // Command not issued in message
 
-    console.log(chalk.cyan(`@${msg.member.displayName} issued command: ${msg.cleanContent}`))
+    const member = msg.member || guild.members.find(m => m.user.id === msg.author.id)
+
+    if (!member) return // Not a member of the server
+
+    console.log(chalk.cyan(`@${member.displayName} issued command: ${msg.cleanContent}`))
 
     const source = {
         message: msg,
         channel: msg.channel,
-        member: msg.member,
+        member: member,
     }
 
     for (let idx = 0; idx < commandConfig.actions.length; idx++) {
