@@ -143,7 +143,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
             await executeActionChain(pinConfig.actions, {
                 message: reaction.message,
                 channel: reaction.message.channel,
-                member: await guild.fetchMember(user),
+                member: reaction.message.member,
             })
         }
     }
