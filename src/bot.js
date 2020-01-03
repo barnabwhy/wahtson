@@ -2,6 +2,7 @@ const { Client } = require('discord.js')
 const chalk = require('chalk')
 const open = require('open')
 
+const { version } = require('../package.json')
 const config = require('./config.js')
 const actions = require('./actions.js')
 
@@ -47,6 +48,7 @@ client.once('ready', async () => {
 })
 
 client.on('message', async msg => {
+    if (!guild) return
     if (msg.guild && msg.guild.id !== guild.id) return
     if (msg.author.bot) return
 
