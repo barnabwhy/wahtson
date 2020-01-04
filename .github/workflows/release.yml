@@ -15,17 +15,15 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: '12.x'
-      - name: Install production dependencies
+      - name: Install dependencies
         run: npm install --only=prod
-      - name: Install build dependencies
-        run: npm install --only=dev
-      - name: Build
-        run: npm run build
+      - name: Compile native addons for Windows also
+        run: npm i -g node-pre-gyp && cd node_modules/sqlite3 && node-pre-gyp configure build --target_platform=windows
       - name: Package
-        run: mv build wahtson && zip wahtson.zip wahtson/*
+        run: zip -r9 WAHtson.zip src migrations node_modules config-example.toml wahtson wahtson.cmd
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: wahtson.zip
+          files: WAHtson.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

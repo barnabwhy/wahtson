@@ -26,7 +26,7 @@ emoji = ":shipit:" # Must be a custom emoji!
 count = 4
 disallow_from = [ "#pins" ]
 
-    # Ths actions are executed once a message hits 4x :shipit: reactions.
+    # These actions are executed once a message hits 4x :shipit: reactions.
     [[pin.actions]]
     type = "COPY_SOURCE_MESSAGE"
     to = "#pins"

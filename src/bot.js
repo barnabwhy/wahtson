@@ -4,7 +4,6 @@ const open = require('open')
 const sqlite = require('sqlite')
 const sql = require('sql-template-strings')
 
-const { version } = require('../package.json')
 const config = require('./config.js')
 const actionFunctions = require('./actions.js')
 
@@ -13,8 +12,10 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const client = new Client()
 let guild, db
 
+process.title = 'WAHtson'
+
 config.load()
-    .then(() => sqlite.open('./database.sqlite', { Promise }))
+    .then(() => sqlite.open('./database.sqlite'), { Promise })
     .then(async _db => {
         db = _db
         await db.migrate()
@@ -131,6 +132,8 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
         if (reaction.message.channel.id === channel.id) return
     }
+
+    console.log(emoji, count)
 
     if (count >= opts.getNumber('count') && emoji.id === opts.getEmoji('emoji').id) {
         const isPinned = !!(await db.get(sql`SELECT * FROM pins WHERE msgid=${reaction.message.id}`))
