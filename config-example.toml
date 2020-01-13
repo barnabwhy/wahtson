@@ -37,7 +37,7 @@ disallow_from = [ "#pins" ]
 
 
 [[reactions]]
-message = "" # Right click on message -> Copy ID
+message = "" # Right click on message -> Copy ID. Omit this line to trigger for all messages.
 emoji = ":other_custom_emoji:"
 
     [[reactions.add_actions]]

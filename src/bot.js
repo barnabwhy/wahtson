@@ -133,7 +133,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
     if (await config.has('reactions')) {
         for (const rConfig of await config.get('reactions')) {
-            if (rConfig.message !== reaction.message.id) {
+            if (rConfig.message && rConfig.message !== reaction.message.id) {
                 continue
             }
 
@@ -161,7 +161,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
     if (await config.has('reactions')) {
         for (const rConfig of await config.get('reactions')) {
-            if (rConfig.message !== reaction.message.id) {
+            if (rConfig.message && rConfig.message !== reaction.message.id) {
                 continue
             }
 
