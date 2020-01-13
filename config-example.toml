@@ -36,6 +36,24 @@ disallow_from = [ "#pins" ]
     text = "Your message was pinned!"
 
 
+[[reactions]]
+message = "" # Right click on message -> Copy ID
+emoji = ":other_custom_emoji:"
+
+    [[reactions.add_actions]]
+    type = "GRANT_ROLE"
+    role = "Awesome Person"
+
+
+    [[reactions.remove_actions]]
+    type = "REPLY_DM"
+    text = "You are no longer awesome."
+
+    [[reactions.remove_actions]]
+    type = "REVOKE_ROLE"
+    role = "Awesome Person"
+
+
 [[commands]]
 usage = "ping"
 

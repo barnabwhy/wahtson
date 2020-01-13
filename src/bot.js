@@ -64,24 +64,26 @@ client.on('message', async msg => {
     if (msg.guild && msg.guild.id !== guild.id) return
     if (msg.author.bot) return
 
-    const { commandAttempted, commandString, commandConfig, args } = await parseMessage(msg)
+    if (await config.has('commands')) {
+        const { commandAttempted, commandString, commandConfig, args } = await parseMessage(msg)
 
-    if (!commandAttempted) return
+        if (!commandAttempted) return
 
-    const member = msg.member || (await guild.fetchMember(msg.author))
+        const member = msg.member || (await guild.fetchMember(msg.author))
 
-    if (!member) return // Not a member of the server
+        if (!member) return // Not a member of the server
 
-    console.log(chalk.cyan(`@${member.displayName} issued command: ${msg.cleanContent}`))
+        console.log(chalk.cyan(`@${member.displayName} issued command: ${msg.cleanContent}`))
 
-    const actions = commandConfig
-        ? commandConfig.actions
-        : (await config.get('on_unknown_command'))
-    await executeActionChain(actions, {
-        message: msg,
-        channel: msg.channel,
-        member: member,
-    })
+        const actions = commandConfig
+            ? commandConfig.actions
+            : (await config.get('on_unknown_command'))
+        await executeActionChain(actions, {
+            message: msg,
+            channel: msg.channel,
+            member: member,
+        })
+    }
 })
 
 client.on('guildMemberAdd', async member => {
@@ -123,8 +125,63 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (!guild) return
     if (reaction.message.guild.id !== guild.id) return
 
-    const { emoji, count } = reaction
+    const member = await guild.fetchMember(user)
 
+    if (await config.has('pin')) {
+        await handlePossiblePin(reaction)
+    }
+
+    if (await config.has('reactions')) {
+        for (const rConfig of await config.get('reactions')) {
+            if (rConfig.message !== reaction.message.id) {
+                continue
+            }
+
+            const opts = makeResolvable(rConfig)
+            const wantedEmoji = opts.getEmoji('emoji')
+
+            if (reaction.emoji.id === wantedEmoji.id) {
+                console.log(chalk.cyan(`@${member.displayName} added ${wantedEmoji} reaction`))
+
+                await executeActionChain(rConfig.add_actions, {
+                    message: reaction.message,
+                    channel: reaction.message.channel,
+                    member,
+                })
+            }
+        }
+    }
+})
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    if (!guild) return
+    if (reaction.message.guild.id !== guild.id) return
+
+    const member = await guild.fetchMember(user)
+
+    if (await config.has('reactions')) {
+        for (const rConfig of await config.get('reactions')) {
+            if (rConfig.message !== reaction.message.id) {
+                continue
+            }
+
+            const opts = makeResolvable(rConfig)
+            const wantedEmoji = opts.getEmoji('emoji')
+
+            if (reaction.emoji.id === wantedEmoji.id) {
+                console.log(chalk.cyan(`@${member.displayName} removed ${wantedEmoji} reaction`))
+
+                await executeActionChain(rConfig.remove_actions, {
+                    message: reaction.message,
+                    channel: reaction.message.channel,
+                    member,
+                })
+            }
+        }
+    }
+})
+
+async function handlePossiblePin(reaction) {
     const pinConfig = await config.get('pin')
     const opts = makeResolvable(pinConfig)
 
@@ -135,9 +192,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
         if (reaction.message.channel.id === channel.id) return
     }
 
-    console.log(emoji, count)
-
-    if (count >= opts.getNumber('count') && emoji.id === opts.getEmoji('emoji').id) {
+    if (reaction.count >= opts.getNumber('count') && reaction.emoji.id === opts.getEmoji('emoji').id) {
         const isPinned = !!(await db.get(sql`SELECT * FROM pins WHERE msgid=${reaction.message.id}`))
 
         if (!isPinned) {
@@ -152,7 +207,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
             })
         }
     }
-})
+}
 
 async function executeActionChain(actions, source) {
     for (let idx = 0; idx < actions.length; idx++) {

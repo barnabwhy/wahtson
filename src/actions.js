@@ -17,6 +17,14 @@ module.exports = {
         await source.member.addRole(opts.getRole('role'))
     },
 
+    // Revokes a role (option: 'role') from the source member.
+    //
+    // If the member doesn't have the role, nothing happens.
+    // If the named role does not exist, an error is thrown.
+    async REVOKE_ROLE(source, opts) {
+        await source.member.removeRole(opts.getRole('role'))
+    },
+
     // Deletes the source message (ie. the message with the command in it).
     async DELETE_SOURCE_MESSAGE(source) {
         await source.message.delete()

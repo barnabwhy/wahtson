@@ -63,4 +63,12 @@ module.exports = {
 
         return cache[key]
     },
+
+    async has(key) {
+        if (!cache) {
+            await this.load()
+        }
+
+        return typeof cache[key] !== 'undefined'
+    }
 }
