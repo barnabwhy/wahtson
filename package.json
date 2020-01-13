@@ -1,6 +1,6 @@
 {
   "name": "wahtson",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "src/bot.js",
   "dependencies": {
     "chalk": "^3.0.0",

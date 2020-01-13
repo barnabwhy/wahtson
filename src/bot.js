@@ -6,13 +6,15 @@ const sql = require('sql-template-strings')
 
 const config = require('./config.js')
 const actionFunctions = require('./actions.js')
+const { version } = require('../package.json')
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const client = new Client()
 let guild, db
 
-process.title = 'WAHtson'
+process.title = `WAHtson ${version}`
+console.log(`WAHtson ${version}`)
 
 config.load()
     .then(() => sqlite.open('./database.sqlite'), { Promise })

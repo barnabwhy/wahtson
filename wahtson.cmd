@@ -1,4 +1,4 @@
 @echo off
-title WAHtson
+call npm install --silent
 node src/bot.js
 pause
