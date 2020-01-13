@@ -3,6 +3,7 @@ const chalk = require('chalk')
 const open = require('open')
 const sqlite = require('sqlite')
 const sql = require('sql-template-strings')
+const shortEmoji = require('emoji-to-short-name')
 
 const config = require('./config.js')
 const actionFunctions = require('./actions.js')
@@ -140,7 +141,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
             const opts = makeResolvable(rConfig)
             const wantedEmoji = opts.getEmoji('emoji')
 
-            if (reaction.emoji.id === wantedEmoji.id) {
+            if (reaction.emoji.name === wantedEmoji) {
                 console.log(chalk.cyan(`@${member.displayName} added ${wantedEmoji} reaction`))
 
                 await executeActionChain(rConfig.add_actions, {
@@ -168,7 +169,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
             const opts = makeResolvable(rConfig)
             const wantedEmoji = opts.getEmoji('emoji')
 
-            if (reaction.emoji.id === wantedEmoji.id) {
+            if (reaction.emoji.name === wantedEmoji) {
                 console.log(chalk.cyan(`@${member.displayName} removed ${wantedEmoji} reaction`))
 
                 await executeActionChain(rConfig.remove_actions, {
@@ -192,7 +193,9 @@ async function handlePossiblePin(reaction) {
         if (reaction.message.channel.id === channel.id) return
     }
 
-    if (reaction.count >= opts.getNumber('count') && reaction.emoji.id === opts.getEmoji('emoji').id) {
+    console.log(reaction.emoji.name, opts.getEmoji('emoji'))
+
+    if (reaction.count >= opts.getNumber('count') && reaction.emoji.name === opts.getEmoji('emoji')) {
         const isPinned = !!(await db.get(sql`SELECT * FROM pins WHERE msgid=${reaction.message.id}`))
 
         if (!isPinned) {
@@ -318,7 +321,7 @@ function makeResolvable(map) {
             return channel
         },
 
-        // Resolves to an Emoji by :name:. Enclosing colons are optional.
+        // Resolves an emoji to its Emoji#name. Enclosing colons are optional.
         getEmoji(key) {
             const maybeWithColons = resolveKey(key)
             const withoutColons = maybeWithColons.startsWith(':')
@@ -330,10 +333,16 @@ function makeResolvable(map) {
             })
 
             if (!emoji) {
-                throw `unable to resolve emoji '${maybeWithColons}'`
+                const decoded = shortEmoji.decode(`:${withoutColons}:`)
+
+                if (decoded.startsWith(':')) {
+                    throw `unable to resolve emoji: ${maybeWithColons}`
+                }
+
+                return decoded
             }
 
-            return emoji
+            return emoji.name
         },
     }
 }

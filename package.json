@@ -1,10 +1,11 @@
 {
   "name": "wahtson",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "src/bot.js",
   "dependencies": {
     "chalk": "^3.0.0",
     "discord.js": "^11.5.1",
+    "emoji-to-short-name": "^1.0.1",
     "open": "^7.0.0",
     "sql-template-strings": "^2.2.2",
     "sqlite": "^3.0.3",
