@@ -2,6 +2,7 @@ const { Client } = require('discord.js')
 const chalk = require('chalk')
 const open = require('open')
 const sqlite = require('sqlite')
+const { Database } = require('sqlite3')
 const sql = require('sql-template-strings')
 const shortEmoji = require('emoji-to-short-name')
 
@@ -18,7 +19,10 @@ process.title = `WAHtson ${version}`
 console.log(`WAHtson ${version}`)
 
 config.load()
-    .then(() => sqlite.open('./database.sqlite'), { Promise })
+    .then(() => sqlite.open({
+        filename: './database.sqlite',
+        driver: Database,
+    }))
     .then(async _db => {
         db = _db
         await db.migrate()
