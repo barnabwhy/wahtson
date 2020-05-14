@@ -3,15 +3,15 @@
   "version": "1.0.4",
   "main": "src/bot.js",
   "dependencies": {
-    "chalk": "^3.0.0",
+    "chalk": "^4.0.0",
     "discord.js": "^11.5.1",
     "emoji-to-short-name": "^1.0.1",
-    "open": "^7.0.0",
+    "open": "^7.0.3",
     "sql-template-strings": "^2.2.2",
     "sqlite": "^3.0.3",
     "toml": "^3.0.0"
   },
   "engines": {
-    "node": "12.x.y"
+    "node": ">=12"
   }
 }
