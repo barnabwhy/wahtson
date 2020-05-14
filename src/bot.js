@@ -197,8 +197,6 @@ async function handlePossiblePin(reaction) {
         if (reaction.message.channel.id === channel.id) return
     }
 
-    console.log(reaction.emoji.name, opts.getEmoji('emoji'))
-
     if (reaction.count >= opts.getNumber('count') && reaction.emoji.name === opts.getEmoji('emoji')) {
         const isPinned = !!(await db.get(sql`SELECT * FROM pins WHERE msgid=${reaction.message.id}`))
 
@@ -350,3 +348,7 @@ function makeResolvable(map) {
         },
     }
 }
+
+process.on('unhandledRejection', error => {
+    console.error(chalk.red(`error: ${error.stack || error}`))
+})
