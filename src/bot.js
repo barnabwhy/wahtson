@@ -45,7 +45,7 @@ client.once('ready', async () => {
         console.log(chalk.red('please invite it using your browser.'))
 
         const { id } = await client.fetchApplication()
-        await open(`https://discordapp.com/oauth2/authorize?client_id=${id}&scope=bot`)
+        await open(`https://discordapp.com/oauth2/authorize?client_id=${id}&scope=bot&guild_id=${serverId}`)
 
         while (true) {
             await sleep(1000)

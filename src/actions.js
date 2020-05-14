@@ -38,15 +38,16 @@ module.exports = {
             embed: {
                 author: {
                     name: source.message.member.displayName,
-                    icon_url: source.message.avatarURL,
+                    icon_url: source.message.author.displayAvatarURL,
                 },
                 image: {
                     url: (source.message.attachments.first() || {}).proxyURL,
                 },
-                url: source.message.url, // Doesn't appear to work >:[
-                description: source.message.content,
-                timestamp: source.message.createdTimestamp,
+                description: `${escapeMarkdown(source.message.content)}\n[Jump to Message](${source.message.url})`,
+                timestamp: source.message.createdTimestamp
             },
         })
     },
 }
+
+const escapeMarkdown = s => s.replace(/([\[\]\(\)])/g, '\\$&')
