@@ -75,3 +75,30 @@ usage = "roses"
     [[commands.actions]]
     type = "REPLY"
     text = "You have been verified."
+
+
+[[commands]]
+usage = "superping"
+
+    # This action will only trigger when the user has the
+    # role 'awesome' AND does not have the role 'broke rules'. 
+    [[commands.actions]]
+    type = "REPLY"
+    text = "**SUPERPONG!!!**"
+    when = [
+        # This action will only be executed when all `when` conditions are true.
+        # If you have only one condition, you can omit the array brackets.
+        { type = 'HAS_ROLE', role = 'awesome' },
+
+        # You can also provide `negate = true` on any condition to negate it.
+        { type = 'HAS_ROLE', role = 'broke rules', negate = true }
+    ]
+
+    # This action will trigger when the above one didn't.
+    [[commands.actions]]
+    type = "REPLY"
+    text = "Sorry, you must be awesome to peform a superping."
+
+        # This means the same as the brackets used above - use whichever you prefer.
+        [[commands.actions.when]]
+        type = 'PREVIOUS_ACTION_SKIPPED'

@@ -8,6 +8,7 @@ const shortEmoji = require('emoji-to-short-name')
 
 const config = require('./config.js')
 const actionFunctions = require('./actions.js')
+const conditionFunctions = require('./conditions.js')
 const { version } = require('../package.json')
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -215,22 +216,69 @@ async function handlePossiblePin(reaction) {
 }
 
 async function executeActionChain(actions, source) {
+    let state = {
+        previousActionSkipped: false,
+    }
+
     for (let idx = 0; idx < actions.length; idx++) {
         const action = actions[idx]
 
-        console.log(chalk.grey(` ${idx + 1}. ${action.type}`))
+        process.stdout.write(chalk.grey(` ${idx + 1}. ${action.type}`))
+
+        if (action.when) {
+            const conditions = Array.isArray(action.when) ? action.when : [action.when]
+            let conditionsOk = true
+
+            for (const condition of conditions) {
+                const conditionFn = conditionFunctions[condition.type]
+                
+                if (!conditionFn) {
+                    console.error(chalk.red(` error: unknown condition type '${condition.type}'`))
+                    conditionsOk = false
+                    break
+                }
+
+                let ok
+                try {
+                    ok = await conditionFn(source, makeResolvable(condition), state)
+                } catch (err) {
+                    console.error(chalk.red(` error: '${err}'`))
+                    conditionsOk = false
+                    break
+                }
+
+                if (condition.negate) {
+                    ok = !ok
+                }
+
+                if (!ok) {
+                    conditionsOk = false
+                    break
+                }
+            }
+
+            if (!conditionsOk) {
+                console.log(chalk.magenta(' skipped'))
+                state.previousActionSkipped = true
+                continue
+            }
+        }
 
         const fn = actionFunctions[action.type]
 
         if (!fn) {
-            console.error(chalk.red(`error: unknown action type '${action.type}'`))
+            console.error(chalk.red(' error: unknown action type'))
             continue
         }
 
-        await fn(source, makeResolvable(action))
+        process.stdout.write('\n')
+
+        await fn(source, makeResolvable(action), state)
             .catch(err => {
-                console.error(chalk.red(`error: ${err}`))
+                console.error(chalk.red(` error: ${err}`))
             })
+        
+        state.previousActionSkipped = false
     }
 }
 
