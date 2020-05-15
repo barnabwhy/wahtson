@@ -8,9 +8,9 @@ module.exports = {
 	//
 	// You can also specify a number of months (option?: 'month')
 	// to allow ex-boosters of n months ago to pass this condition too.
-	async IS_NITRO_BOOSTER(source) {
+	async IS_NITRO_BOOSTER(source, opts) {
 		const ONE_MONTH = 2629800000
-		let timeRequired = (source.months || 1) * ONE_MONTH
+		let timeRequired = (opts.months || 1) * ONE_MONTH
 
 		return (Date.now() - source.member.premiumSince) < timeRequired
 	},
