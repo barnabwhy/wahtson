@@ -34,20 +34,74 @@ module.exports = {
     async COPY_SOURCE_MESSAGE(source, opts) {
         const channel = opts.getChannel('to')
 
+        const attachments = [...source.message.attachments.values()]
+        const primaryAttachment = attachments.shift()
+
+        let attachmentEmbed = {}, files = []
+        switch (attachmentType(primaryAttachment)) {
+            case 'image':
+                attachmentEmbed = {
+                    image: { url: primaryAttachment.proxyURL }
+                }
+                break
+            case 'video':
+                files = [
+                    { attachment: primaryAttachment.proxyURL }
+                ]
+                break
+            default:
+                // Unknown; we'll handle it with all the other attachments
+                if (primaryAttachment)
+                    attachments.unshift(primaryAttachment)
+        }
+
+        const fields = []
+
+        // Add reamining attachments to an extra field
+        if (attachments.length) {
+            fields.push({
+                name: 'Attachments',
+                value: attachments
+                    .map(a => `[${a.proxyURL.substring(a.proxyURL.lastIndexOf('/')+1)}](${a.proxyURL})`)
+                    .join('\n')
+            })
+        }
+
         channel.send({
+            files,
             embed: {
                 author: {
                     name: source.message.member.displayName,
-                    icon_url: source.message.author.displayAvatarURL,
+                    icon_url: await source.message.author.displayAvatarURL(),
                 },
-                image: {
-                    url: (source.message.attachments.first() || {}).proxyURL,
-                },
-                description: `${escapeMarkdown(source.message.content)}\n[Jump to Message](${source.message.url})`,
-                timestamp: source.message.createdTimestamp
+
+                description: `${escapeMarkdown(source.message.content)}\n\n[Jump to Message](${source.message.url})`,
+                timestamp: source.message.createdTimestamp,                
+                fields,
+
+                ...attachmentEmbed,
             },
         })
     },
 }
 
 const escapeMarkdown = s => s.replace(/([\[\]\(\)])/g, '\\$&')
+
+const extensionTypes = {
+    'png': 'image',
+    'jpg': 'image',
+    'jpeg': 'image',
+    'gif': 'image',
+    'webp': 'image',
+    'mp4': 'video',
+    'mov': 'video',
+    'webm': 'video'
+}
+
+const attachmentType = a => extensionTypes[fileExtension(a.url)]
+
+const fileExtension = url => {
+    if (!url) return
+
+    return url.split('.').pop().split(/\#|\?/)[0]
+}
