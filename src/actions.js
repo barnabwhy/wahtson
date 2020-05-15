@@ -38,21 +38,23 @@ module.exports = {
         const primaryAttachment = attachments.shift()
 
         let attachmentEmbed = {}, files = []
-        switch (attachmentType(primaryAttachment)) {
-            case 'image':
-                attachmentEmbed = {
-                    image: { url: primaryAttachment.proxyURL }
-                }
-                break
-            case 'video':
-                files = [
-                    { attachment: primaryAttachment.proxyURL }
-                ]
-                break
-            default:
-                // Unknown; we'll handle it with all the other attachments
-                if (primaryAttachment)
+
+        if (primaryAttachment) {
+            switch (attachmentType(primaryAttachment)) {
+                case 'image':
+                    attachmentEmbed = {
+                        image: { url: primaryAttachment.proxyURL }
+                    }
+                    break
+                case 'video':
+                    files = [
+                        { attachment: primaryAttachment.proxyURL }
+                    ]
+                    break
+                default:
+                    // Unknown; we'll handle it with all the other attachments
                     attachments.unshift(primaryAttachment)
+            }
         }
 
         const fields = []
