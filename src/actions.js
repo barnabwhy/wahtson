@@ -39,19 +39,18 @@ module.exports = {
         const attachments = [...source.message.attachments.values()]
         const primaryAttachment = attachments.shift()
 
-        let attachmentEmbed = {}, files = []
+        let attachmentEmbed = {},
+            files = []
 
         if (primaryAttachment) {
             switch (attachmentType(primaryAttachment)) {
                 case 'image':
                     attachmentEmbed = {
-                        image: { url: primaryAttachment.proxyURL }
+                        image: { url: primaryAttachment.proxyURL },
                     }
                     break
                 case 'video':
-                    files = [
-                        { attachment: primaryAttachment.proxyURL }
-                    ]
+                    files = [{ attachment: primaryAttachment.proxyURL }]
                     break
                 default:
                     // Unknown; we'll handle it with all the other attachments
@@ -66,8 +65,13 @@ module.exports = {
             fields.push({
                 name: 'Attachments',
                 value: attachments
-                    .map(a => `[${a.proxyURL.substring(a.proxyURL.lastIndexOf('/')+1)}](${a.proxyURL})`)
-                    .join('\n')
+                    .map(
+                        a =>
+                            `[${a.proxyURL.substring(a.proxyURL.lastIndexOf('/') + 1)}](${
+                                a.proxyURL
+                            })`,
+                    )
+                    .join('\n'),
             })
         }
 
@@ -79,45 +83,66 @@ module.exports = {
                     icon_url: await source.message.author.displayAvatarURL(),
                 },
 
-                description: `${escapeMarkdown(source.message.content)}\n\n[Jump to Message](${source.message.url})`,
-                timestamp: source.message.createdTimestamp,                
+                description: `${escapeMarkdown(source.message.content)}\n\n[Jump to Message](${
+                    source.message.url
+                })`,
+                timestamp: source.message.createdTimestamp,
                 fields,
 
                 ...attachmentEmbed,
             },
         })
     },
-    
+
     async GET_BALANCE(source, opts, state) {
         var balance = await getBalance(source.member.id, state)
-        var placeholders = { "$balance": balance }
+        var placeholders = { $balance: balance }
         source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
     },
 
     async PURCHASE_ITEM(source, opts, state) {
-        var purchase = await state.db.get('SELECT * FROM purchases WHERE userid = ? AND item = ?', source.member.id, opts.getText('item'));
+        var purchase = await state.db.get(
+            'SELECT * FROM purchases WHERE userid = ? AND item = ?',
+            source.member.id,
+            opts.getText('item'),
+        )
         var balance = await getBalance(source.member.id, state)
 
-        var placeholders = { "$item" : opts.getText('item'), "$balance" : balance, "$outstanding" : opts.getNumber('price')-balance };
+        var placeholders = {
+            $item: opts.getText('item'),
+            $balance: balance,
+            $outstanding: opts.getNumber('price') - balance,
+        }
 
-        if(purchase == undefined || opts.getBoolean("repeatable")) {
-            if(balance >= opts.getNumber('price')) {
-                state.db.run('UPDATE users SET balance = ? WHERE id = ?', balance-opts.getNumber('price'), source.member.id);
-                await state.db.run('INSERT INTO purchases (userid, item) VALUES (?, ?)', source.member.id, opts.getText('item'));
+        if (purchase == undefined || opts.getBoolean('repeatable')) {
+            if (balance >= opts.getNumber('price')) {
+                state.db.run(
+                    'UPDATE users SET balance = ? WHERE id = ?',
+                    balance - opts.getNumber('price'),
+                    source.member.id,
+                )
+                await state.db.run(
+                    'INSERT INTO purchases (userid, item) VALUES (?, ?)',
+                    source.member.id,
+                    opts.getText('item'),
+                )
                 source.channel.send(replacePlaceholders(opts.getText('text_success'), placeholders))
 
                 if (await state.config.has('purchases')) {
-            
                     if (!source.member) return // Not a member of the server
-        
-                    console.log(chalk.cyan(`@${source.member.displayName} purchased: ${opts.getText('item')}`))
-        
+
+                    console.log(
+                        chalk.cyan(
+                            `@${source.member.displayName} purchased: ${opts.getText('item')}`,
+                        ),
+                    )
+
                     var purchaseConfig = (await state.config.get('purchases')).find(pch => {
-                        const [ itemName ] = pch.item.split(' ') // TODO: parse properly
+                        const [itemName] = pch.item.split(' ') // TODO: parse properly
                         return itemName === opts.getText('item')
                     })
 
-                    if(purchaseConfig) {
+                    if (purchaseConfig) {
                         await state.executeActionChain(purchaseConfig.actions, {
                             message: source.message,
                             channel: source.channel,
@@ -136,37 +161,41 @@ module.exports = {
 
     async GIVE_COINS(source, opts, state) {
         var balance = await getBalance(source.member.id, state)
-        state.db.run('UPDATE users SET balance = ? WHERE id = ?', balance+opts.getNumber('amount'), source.member.id);
+        state.db.run(
+            'UPDATE users SET balance = ? WHERE id = ?',
+            balance + opts.getNumber('amount'),
+            source.member.id,
+        )
 
-        if(opts.getText('text')) {
-            var placeholders = { "$amount" : opts.getNumber('amount') };
+        if (opts.getText('text')) {
+            var placeholders = { $amount: opts.getNumber('amount') }
             source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
         }
     },
 }
 
 const replacePlaceholders = (str, placeholders) => {
-    Object.keys(placeholders).forEach((p) => {
-        var re = new RegExp(RegExp.quote(p),"g")
-        str = str.replace(re, placeholders[p]);
-    });
-    return str;
+    Object.keys(placeholders).forEach(p => {
+        var re = new RegExp(RegExp.quote(p), 'g')
+        str = str.replace(re, placeholders[p])
+    })
+    return str
 }
-RegExp.quote = function(str) {
-    return str.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1");
-};
+RegExp.quote = function (str) {
+    return str.replace(/([.?*+^$[\]\\(){}|-])/g, '\\$1')
+}
 
 const escapeMarkdown = s => s.replace(/([\[\]\(\)])/g, '\\$&')
 
 const extensionTypes = {
-    'png': 'image',
-    'jpg': 'image',
-    'jpeg': 'image',
-    'gif': 'image',
-    'webp': 'image',
-    'mp4': 'video',
-    'mov': 'video',
-    'webm': 'video'
+    png: 'image',
+    jpg: 'image',
+    jpeg: 'image',
+    gif: 'image',
+    webp: 'image',
+    mp4: 'video',
+    mov: 'video',
+    webm: 'video',
 }
 
 const attachmentType = a => extensionTypes[fileExtension(a.url)]
@@ -178,11 +207,15 @@ const fileExtension = url => {
 }
 
 const getBalance = async (id, state) => {
-    var balance = await state.db.get('SELECT * FROM users WHERE id = ?', id);
-    if(balance == undefined || isNaN(balance.balance)) {
-        await state.db.run('INSERT INTO users (id, balance) VALUES (?, ?)', id, (await state.config.get('economy')).starting_coins);
+    var balance = await state.db.get('SELECT * FROM users WHERE id = ?', id)
+    if (balance == undefined || isNaN(balance.balance)) {
+        await state.db.run(
+            'INSERT INTO users (id, balance) VALUES (?, ?)',
+            id,
+            (await state.config.get('economy')).starting_coins,
+        )
     }
-    balance = await state.db.get('SELECT * FROM users WHERE id = ?', id);
+    balance = await state.db.get('SELECT * FROM users WHERE id = ?', id)
 
     return balance.balance
 }

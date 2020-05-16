@@ -2,6 +2,10 @@
   "name": "wahtson",
   "version": "1.1.2",
   "main": "src/bot.js",
+  "scripts": {
+    "start": "node .",
+    "lint": "prettier --single-quote --trailing-comma all --no-semi --arrow-parens avoid --print-width 100 --tab-width 4 --write src/**/*.js"
+  },
   "dependencies": {
     "chalk": "^4.0.0",
     "discord.js": "^12.2.0",
@@ -11,6 +15,9 @@
     "sqlite": "^4.0.7",
     "sqlite3": "^4.2.0",
     "toml": "^3.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^2.0.5"
   },
   "engines": {
     "node": ">=12"

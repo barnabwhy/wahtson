@@ -8,16 +8,16 @@ const chalk = require('chalk')
 const CONFIG_TOML_PATH = './config.toml'
 const CONFIG_EXAMPLE_PATH = path.join(__dirname, '../config-example.toml')
 
-let cache, isWatching = false
+let cache,
+    isWatching = false
 
 module.exports = {
     async load() {
-        const source = await p(fs.readFile)(CONFIG_TOML_PATH)
-            .catch(async err => {
-                console.log(chalk.red('config.toml not found! copying the example file...'))
-                await p(fs.copyFile)(CONFIG_EXAMPLE_PATH, CONFIG_TOML_PATH)
-                return await p(fs.readFile)(CONFIG_TOML_PATH)
-            })
+        const source = await p(fs.readFile)(CONFIG_TOML_PATH).catch(async err => {
+            console.log(chalk.red('config.toml not found! copying the example file...'))
+            await p(fs.copyFile)(CONFIG_EXAMPLE_PATH, CONFIG_TOML_PATH)
+            return await p(fs.readFile)(CONFIG_TOML_PATH)
+        })
 
         if (!isWatching) {
             isWatching = true
@@ -28,9 +28,11 @@ module.exports = {
         }
 
         try {
-            return cache = toml.parse(source)
+            return (cache = toml.parse(source))
         } catch (err) {
-            console.error(chalk.red(`syntax error in config.toml on line ${err.line} column ${err.column}`))
+            console.error(
+                chalk.red(`syntax error in config.toml on line ${err.line} column ${err.column}`),
+            )
 
             await open(CONFIG_TOML_PATH, { app: 'notepad', wait: true })
             await this.load()
@@ -70,5 +72,5 @@ module.exports = {
         }
 
         return typeof cache[key] !== 'undefined'
-    }
+    },
 }

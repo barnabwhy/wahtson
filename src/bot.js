@@ -19,11 +19,14 @@ let guild, db
 process.title = `WAHtson ${version}`
 console.log(`WAHtson ${version}`)
 
-config.load()
-    .then(() => sqlite.open({
-        filename: './database.sqlite',
-        driver: Database,
-    }))
+config
+    .load()
+    .then(() =>
+        sqlite.open({
+            filename: './database.sqlite',
+            driver: Database,
+        }),
+    )
     .then(async _db => {
         db = _db
         await db.migrate()
@@ -50,7 +53,9 @@ client.once('ready', async () => {
         console.log(chalk.red('please invite it using your browser.'))
 
         const { id } = await client.fetchApplication()
-        await open(`https://discordapp.com/oauth2/authorize?client_id=${id}&scope=bot&guild_id=${serverId}`)
+        await open(
+            `https://discordapp.com/oauth2/authorize?client_id=${id}&scope=bot&guild_id=${serverId}`,
+        )
 
         while (true) {
             await sleep(1000)
@@ -90,7 +95,7 @@ client.on('message', async msg => {
 
             const actions = commandConfig
                 ? commandConfig.actions
-                : (await config.get('on_unknown_command'))
+                : await config.get('on_unknown_command')
             await executeActionChain(actions, {
                 message: msg,
                 channel: msg.channel,
@@ -117,7 +122,7 @@ client.on('guildMemberAdd', async member => {
 
 // Emit messageReactionAdd/Remove events even for uncached messages.
 client.on('raw', async packet => {
-    if (!['MESSAGE_REACTION_ADD', 'MESSAGE_REACTION_REMOVE'].includes(packet.t)) return;
+    if (!['MESSAGE_REACTION_ADD', 'MESSAGE_REACTION_REMOVE'].includes(packet.t)) return
 
     const channel = client.channels.cache.get(packet.d.channel_id)
 
@@ -125,10 +130,13 @@ client.on('raw', async packet => {
     if (channel.messages.cache.has(packet.d.message_id)) return
 
     const message = await channel.messages.fetch(packet.d.message_id)
-    const emoji = packet.d.emoji.id ? `${packet.d.emoji.name}:${packet.d.emoji.id}` : packet.d.emoji.name
+    const emoji = packet.d.emoji.id
+        ? `${packet.d.emoji.name}:${packet.d.emoji.id}`
+        : packet.d.emoji.name
 
     const reaction = message.reactions.cache.get(emoji)
-    if (reaction) reaction.users.cache.set(packet.d.user_id, client.users.cache.get(packet.d.user_id))
+    if (reaction)
+        reaction.users.cache.set(packet.d.user_id, client.users.cache.get(packet.d.user_id))
 
     if (packet.t === 'MESSAGE_REACTION_ADD') {
         client.emit('messageReactionAdd', reaction, client.users.cache.get(packet.d.user_id))
@@ -210,8 +218,13 @@ async function handlePossiblePin(reaction) {
         if (reaction.message.channel.id === channel.id) return
     }
 
-    if (reaction.count >= opts.getNumber('count') && reaction.emoji.name === opts.getEmoji('emoji')) {
-        const isPinned = !!(await db.get(sql`SELECT * FROM pins WHERE msgid=${reaction.message.id}`))
+    if (
+        reaction.count >= opts.getNumber('count') &&
+        reaction.emoji.name === opts.getEmoji('emoji')
+    ) {
+        const isPinned = !!(await db.get(
+            sql`SELECT * FROM pins WHERE msgid=${reaction.message.id}`,
+        ))
 
         if (!isPinned) {
             console.log(chalk.cyan(`pinning message`))
@@ -233,24 +246,24 @@ async function executeActionChain(actions, source) {
         previousActionSkipped: false,
         db: db,
         config: config,
-        executeActionChain: executeActionChain
+        executeActionChain: executeActionChain,
     }
 
     for (let idx = 0; idx < actions.length; idx++) {
         const action = actions[idx]
 
-        if(action.modifiers) {
-            var modsDone = 0;
-            for(var i = 0; i < Object.keys(action.modifiers).length; i++) {
-                var mod = action.modifiers[Object.keys(action.modifiers)[i]];
-                if(await userHasItem(source.member.id, mod.item)) {
+        if (action.modifiers) {
+            var modsDone = 0
+            for (var i = 0; i < Object.keys(action.modifiers).length; i++) {
+                var mod = action.modifiers[Object.keys(action.modifiers)[i]]
+                if (await userHasItem(source.member.id, mod.item)) {
                     for (key in mod.options) {
-                        action[key] = mod.options[key];
+                        action[key] = mod.options[key]
                     }
                     modsDone++
                 }
             }
-            await modsDone == Object.keys(action.modifiers).length
+            ;(await modsDone) == Object.keys(action.modifiers).length
         }
 
         process.stdout.write(chalk.grey(` ${idx + 1}. ${action.type}`))
@@ -259,10 +272,9 @@ async function executeActionChain(actions, source) {
             const conditions = Array.isArray(action.when) ? action.when : [action.when]
             let conditionsOk = true
 
-
             for (const condition of conditions) {
                 const conditionFn = conditionFunctions[condition.type]
-                
+
                 if (!conditionFn) {
                     console.error(chalk.red(` error: unknown condition type '${condition.type}'`))
                     conditionsOk = false
@@ -304,11 +316,10 @@ async function executeActionChain(actions, source) {
 
         process.stdout.write('\n')
 
-        await fn(source, makeResolvable(action), state)
-            .catch(err => {
-                console.error(chalk.red(` error: ${err}`))
-            })
-        
+        await fn(source, makeResolvable(action), state).catch(err => {
+            console.error(chalk.red(` error: ${err}`))
+        })
+
         state.previousActionSkipped = false
     }
 }
@@ -327,7 +338,7 @@ async function parseMessage(msg) {
         return { commandAttempted: false }
     }
 
-    const [ commandString, ...rest ] = substring.split(' ')
+    const [commandString, ...rest] = substring.split(' ')
     const argString = rest.join(' ')
 
     return {
@@ -335,7 +346,7 @@ async function parseMessage(msg) {
 
         commandString,
         commandConfig: (await config.get('commands')).find(cmd => {
-            const [ commandName ] = cmd.usage.split(' ') // TODO: parse properly
+            const [commandName] = cmd.usage.split(' ') // TODO: parse properly
             return commandName === commandString
         }),
 
@@ -369,7 +380,7 @@ function makeResolvable(map) {
         getBoolean(key, defaultVal = false) {
             try {
                 return resolveKey(key)
-            } catch(e) {
+            } catch (e) {
                 return defaultVal
             }
         },
@@ -437,8 +448,8 @@ function makeResolvable(map) {
 }
 
 async function userHasItem(id, item) {
-    var itemResult = await db.get('SELECT * FROM purchases WHERE userid = ? AND item = ?', id, item);
-    
+    var itemResult = await db.get('SELECT * FROM purchases WHERE userid = ? AND item = ?', id, item)
+
     return itemResult != undefined
 }
 
@@ -446,16 +457,16 @@ process.on('unhandledRejection', error => {
     console.error(chalk.red(`error: ${error.stack || error}`))
 })
 
-Object.defineProperty(Array.prototype, "asyncForEach", {
+Object.defineProperty(Array.prototype, 'asyncForEach', {
     enumerable: false,
-    value: function(task){
+    value: function (task) {
         return new Promise((resolve, reject) => {
-            this.forEach(function(item, index, array){
-                task(item, index, array);
-                if(Object.is(array.length - 1, index)){
+            this.forEach(function (item, index, array) {
+                task(item, index, array)
+                if (Object.is(array.length - 1, index)) {
                     resolve({ status: 'finished', count: array.length })
                 }
-            });        
+            })
         })
-    }
-});
+    },
+})
