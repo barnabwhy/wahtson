@@ -1,9 +1,10 @@
 const chalk = require('chalk')
+const { replacePlaceholders, attachmentType, escapeMarkdown, getBalance } = require('./util.js')
 
 module.exports = {
     // Sends a message (option: 'text') to the source channel.
     async REPLY(source, opts) {
-        await source.channel.send(replacePlaceholdersOptions(opts.getText('text'), opts))
+        await source.channel.send(replacePlaceholders(opts.getText('text'), opts))
     },
 
     // Sends a DM (option: 'text') to the source user.
@@ -95,20 +96,20 @@ module.exports = {
     },
 
     async GET_BALANCE(source, opts, state) {
-        var balance = await getBalance(source.member.id, state)
-        var placeholders = { $balance: balance }
+        const balance = await getBalance(source.member.id, state)
+        const placeholders = { $balance: balance }
         source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
     },
 
     async PURCHASE_ITEM(source, opts, state) {
-        var purchase = await state.db.get(
+        const purchase = await state.db.get(
             'SELECT * FROM purchases WHERE userid = ? AND item = ?',
             source.member.id,
             opts.getText('item'),
         )
-        var balance = await getBalance(source.member.id, state)
+        const balance = await getBalance(source.member.id, state)
 
-        var placeholders = {
+        const placeholders = {
             $item: opts.getText('item'),
             $balance: balance,
             $outstanding: opts.getNumber('price') - balance,
@@ -137,7 +138,7 @@ module.exports = {
                         ),
                     )
 
-                    var purchaseConfig = (await state.config.get('purchases')).find(pch => {
+                    const purchaseConfig = (await state.config.get('purchases')).find(pch => {
                         const [itemName] = pch.item.split(' ') // TODO: parse properly
                         return itemName === opts.getText('item')
                     })
@@ -160,7 +161,7 @@ module.exports = {
     },
 
     async GIVE_COINS(source, opts, state) {
-        var balance = await getBalance(source.member.id, state)
+        const balance = await getBalance(source.member.id, state)
         state.db.run(
             'UPDATE users SET balance = ? WHERE id = ?',
             balance + opts.getNumber('amount'),
@@ -168,54 +169,8 @@ module.exports = {
         )
 
         if (opts.getText('text')) {
-            var placeholders = { $amount: opts.getNumber('amount') }
+            const placeholders = { $amount: opts.getNumber('amount') }
             source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
         }
     },
-}
-
-const replacePlaceholders = (str, placeholders) => {
-    Object.keys(placeholders).forEach(p => {
-        var re = new RegExp(RegExp.quote(p), 'g')
-        str = str.replace(re, placeholders[p])
-    })
-    return str
-}
-RegExp.quote = function (str) {
-    return str.replace(/([.?*+^$[\]\\(){}|-])/g, '\\$1')
-}
-
-const escapeMarkdown = s => s.replace(/([\[\]\(\)])/g, '\\$&')
-
-const extensionTypes = {
-    png: 'image',
-    jpg: 'image',
-    jpeg: 'image',
-    gif: 'image',
-    webp: 'image',
-    mp4: 'video',
-    mov: 'video',
-    webm: 'video',
-}
-
-const attachmentType = a => extensionTypes[fileExtension(a.url)]
-
-const fileExtension = url => {
-    if (!url) return
-
-    return url.split('.').pop().split(/\#|\?/)[0]
-}
-
-const getBalance = async (id, state) => {
-    var balance = await state.db.get('SELECT * FROM users WHERE id = ?', id)
-    if (balance == undefined || isNaN(balance.balance)) {
-        await state.db.run(
-            'INSERT INTO users (id, balance) VALUES (?, ?)',
-            id,
-            (await state.config.get('economy')).starting_coins,
-        )
-    }
-    balance = await state.db.get('SELECT * FROM users WHERE id = ?', id)
-
-    return balance.balance
 }

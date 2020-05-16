@@ -1,10 +1,18 @@
+# See https://github.com/nanaian/wahtson/wiki/config.toml for documentation.
+
 # Core bot options.
 bot_token = ""
-server_id = "413445781295464449"
+server_id = ""
 
 # Command prefix that must be placed before commands in order to issue them.
 # When talking to the bot in DMs this is optional.
-command_prefix = "!wah "
+command_prefix = "!"
+
+# Economy settings. These are optional; if you avoid using coin-related
+# actions/conditions, you don't need to provide this.
+[economy]
+starting_coins = 0
+
 
 # These actions are executed when an unknown command is issued (ie. one not
 # defined in the 'commands' list).
@@ -63,21 +71,6 @@ usage = "ping"
 
 
 [[commands]]
-usage = "roses"
-
-    [[commands.actions]]
-    type = "GRANT_ROLE"
-    role = "Verified"
-
-    [[commands.actions]]
-    type = "DELETE_SOURCE_MESSAGE"
-
-    [[commands.actions]]
-    type = "REPLY"
-    text = "You have been verified."
-
-
-[[commands]]
 usage = "superping"
 
     # This action will only trigger when the user has the
@@ -103,26 +96,28 @@ usage = "superping"
         [[commands.actions.when]]
         type = 'PREVIOUS_ACTION_SKIPPED'
 
+
 [[commands]]
-usage = "buy_nothing"
+usage = "buy_taco"
 
     [[commands.actions]]
     type = "PURCHASE_ITEM"
-    item = "nothing"
+    item = "Taco"
     repeatable = true
     price = 2
     # Placeholders: $item, $balance, $outstanding, $transaction
     text_success = "Successfully purchased $item, new balance: $balance"
     text_poor = "Not enough coins to purchase $item, you need $outstanding more"
-    text_duplicate = "You already have that item"
+    text_duplicate = "You already have that item" # Only used when `repeatable = false`
 
 [[purchases]]
-item = "nothing"
+item = "Taco"
 
     [[purchases.actions]]
     type = "REPLY"
-    text = "You are stupid for buying nothing"
-    
+    text = "Hope you enjoy your taco!"
+
+
 [[commands]]
 usage = "daily"
 
@@ -134,5 +129,5 @@ usage = "daily"
 
     [[commands.actions]]
     type = "REPLY"
-    text = "You have to wait until tomorrow to use `!wah daily` again"
+    text = "You have to wait until tomorrow to use `!daily` again"
     when = { type = 'TIME_SINCE', time = { days = 1 }, negate = true }

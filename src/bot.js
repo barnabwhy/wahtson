@@ -7,11 +7,10 @@ const sql = require('sql-template-strings')
 const shortEmoji = require('emoji-to-short-name')
 
 const config = require('./config.js')
+const { sleep, userHasItem } = require('./util.js')
 const actionFunctions = require('./actions.js')
 const conditionFunctions = require('./conditions.js')
 const { version } = require('../package.json')
-
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const client = new Client()
 let guild, db
@@ -253,17 +252,15 @@ async function executeActionChain(actions, source) {
         const action = actions[idx]
 
         if (action.modifiers) {
-            var modsDone = 0
-            for (var i = 0; i < Object.keys(action.modifiers).length; i++) {
-                var mod = action.modifiers[Object.keys(action.modifiers)[i]]
+            for (let i = 0; i < Object.keys(action.modifiers).length; i++) {
+                let mod = action.modifiers[Object.keys(action.modifiers)[i]]
+
                 if (await userHasItem(source.member.id, mod.item)) {
                     for (key in mod.options) {
                         action[key] = mod.options[key]
                     }
-                    modsDone++
                 }
             }
-            ;(await modsDone) == Object.keys(action.modifiers).length
         }
 
         process.stdout.write(chalk.grey(` ${idx + 1}. ${action.type}`))
@@ -447,26 +444,6 @@ function makeResolvable(map) {
     }
 }
 
-async function userHasItem(id, item) {
-    var itemResult = await db.get('SELECT * FROM purchases WHERE userid = ? AND item = ?', id, item)
-
-    return itemResult != undefined
-}
-
 process.on('unhandledRejection', error => {
     console.error(chalk.red(`error: ${error.stack || error}`))
-})
-
-Object.defineProperty(Array.prototype, 'asyncForEach', {
-    enumerable: false,
-    value: function (task) {
-        return new Promise((resolve, reject) => {
-            this.forEach(function (item, index, array) {
-                task(item, index, array)
-                if (Object.is(array.length - 1, index)) {
-                    resolve({ status: 'finished', count: array.length })
-                }
-            })
-        })
-    },
 })
