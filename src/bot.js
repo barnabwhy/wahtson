@@ -73,22 +73,31 @@ client.on('message', async msg => {
     if (await config.has('commands')) {
         const { commandAttempted, commandString, commandConfig, args } = await parseMessage(msg)
 
-        if (!commandAttempted) return
+        if (!commandAttempted) {
+            const member = msg.member || (await guild.fetchMember(msg.author))
+            await executeActionChain(await config.get('on_message'), {
+                message: msg,
+                channel: msg.channel,
+                member: msg.member,
+                command: null,
+            })
+        } else {
+            const member = msg.member || (await guild.fetchMember(msg.author))
 
-        const member = msg.member || (await guild.fetchMember(msg.author))
+            if (!member) return // Not a member of the server
 
-        if (!member) return // Not a member of the server
+            console.log(chalk.cyan(`@${member.displayName} issued command: ${msg.cleanContent}`))
 
-        console.log(chalk.cyan(`@${member.displayName} issued command: ${msg.cleanContent}`))
-
-        const actions = commandConfig
-            ? commandConfig.actions
-            : (await config.get('on_unknown_command'))
-        await executeActionChain(actions, {
-            message: msg,
-            channel: msg.channel,
-            member: member,
-        })
+            const actions = commandConfig
+                ? commandConfig.actions
+                : (await config.get('on_unknown_command'))
+            await executeActionChain(actions, {
+                message: msg,
+                channel: msg.channel,
+                member: member,
+                command: commandString,
+            })
+        }
     }
 })
 
@@ -102,6 +111,7 @@ client.on('guildMemberAdd', async member => {
         message: null,
         channel: null,
         member: member,
+        command: null,
     })
 })
 
@@ -153,6 +163,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
                     message: reaction.message,
                     channel: reaction.message.channel,
                     member,
+                    command: null,
                 })
             }
         }
@@ -181,6 +192,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
                     message: reaction.message,
                     channel: reaction.message.channel,
                     member,
+                    command: null,
                 })
             }
         }
@@ -210,6 +222,7 @@ async function handlePossiblePin(reaction) {
                 message: reaction.message,
                 channel: reaction.message.channel,
                 member: reaction.message.member,
+                command: null,
             })
         }
     }
@@ -218,16 +231,34 @@ async function handlePossiblePin(reaction) {
 async function executeActionChain(actions, source) {
     let state = {
         previousActionSkipped: false,
+        db: db,
+        config: config,
+        executeActionChain: executeActionChain
     }
 
     for (let idx = 0; idx < actions.length; idx++) {
         const action = actions[idx]
+
+        if(action.modifiers) {
+            var modsDone = 0;
+            for(var i = 0; i < Object.keys(action.modifiers).length; i++) {
+                var mod = action.modifiers[Object.keys(action.modifiers)[i]];
+                if(await userHasItem(source.member.id, mod.item)) {
+                    for (key in mod.options) {
+                        action[key] = mod.options[key];
+                    }
+                    modsDone++
+                }
+            }
+            await modsDone == Object.keys(action.modifiers).length
+        }
 
         process.stdout.write(chalk.grey(` ${idx + 1}. ${action.type}`))
 
         if (action.when) {
             const conditions = Array.isArray(action.when) ? action.when : [action.when]
             let conditionsOk = true
+
 
             for (const condition of conditions) {
                 const conditionFn = conditionFunctions[condition.type]
@@ -335,6 +366,14 @@ function makeResolvable(map) {
             return +resolveKey(key)
         },
 
+        getBoolean(key, defaultVal = false) {
+            try {
+                return resolveKey(key)
+            } catch(e) {
+                return defaultVal
+            }
+        },
+
         // Resolves to a Role by name or id.
         getRole(key) {
             const roleNameOrId = resolveKey(key)
@@ -397,6 +436,26 @@ function makeResolvable(map) {
     }
 }
 
+async function userHasItem(id, item) {
+    var itemResult = await db.get('SELECT * FROM purchases WHERE userid = ? AND item = ?', id, item);
+    
+    return itemResult != undefined
+}
+
 process.on('unhandledRejection', error => {
     console.error(chalk.red(`error: ${error.stack || error}`))
 })
+
+Object.defineProperty(Array.prototype, "asyncForEach", {
+    enumerable: false,
+    value: function(task){
+        return new Promise((resolve, reject) => {
+            this.forEach(function(item, index, array){
+                task(item, index, array);
+                if(Object.is(array.length - 1, index)){
+                    resolve({ status: 'finished', count: array.length })
+                }
+            });        
+        })
+    }
+});

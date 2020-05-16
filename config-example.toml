@@ -102,3 +102,37 @@ usage = "superping"
         # This means the same as the brackets used above - use whichever you prefer.
         [[commands.actions.when]]
         type = 'PREVIOUS_ACTION_SKIPPED'
+
+[[commands]]
+usage = "buy_nothing"
+
+    [[commands.actions]]
+    type = "PURCHASE_ITEM"
+    item = "nothing"
+    repeatable = true
+    price = 2
+    # Placeholders: $item, $balance, $outstanding, $transaction
+    text_success = "Successfully purchased $item, new balance: $balance"
+    text_poor = "Not enough coins to purchase $item, you need $outstanding more"
+    text_duplicate = "You already have that item"
+
+[[purchases]]
+item = "nothing"
+
+    [[purchases.actions]]
+    type = "REPLY"
+    text = "You are stupid for buying nothing"
+    
+[[commands]]
+usage = "daily"
+
+    [[commands.actions]]
+    type = "GIVE_COINS"
+    amount = "50"
+    text = "You have claimed your $amount daily coins"
+    when = { type = 'TIME_SINCE', time = { days = 1 }, count_use = false }
+
+    [[commands.actions]]
+    type = "REPLY"
+    text = "You have to wait until tomorrow to use `!wah daily` again"
+    when = { type = 'TIME_SINCE', time = { days = 1 }, negate = true }

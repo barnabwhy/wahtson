@@ -1,7 +1,9 @@
+const chalk = require('chalk')
+
 module.exports = {
     // Sends a message (option: 'text') to the source channel.
     async REPLY(source, opts) {
-        await source.channel.send(opts.getText('text'))
+        await source.channel.send(replacePlaceholdersOptions(opts.getText('text'), opts))
     },
 
     // Sends a DM (option: 'text') to the source user.
@@ -85,7 +87,74 @@ module.exports = {
             },
         })
     },
+    
+    async GET_BALANCE(source, opts, state) {
+        var balance = await getBalance(source.member.id, state)
+        var placeholders = { "$balance": balance }
+        source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
+    },
+
+    async PURCHASE_ITEM(source, opts, state) {
+        var purchase = await state.db.get('SELECT * FROM purchases WHERE userid = ? AND item = ?', source.member.id, opts.getText('item'));
+        var balance = await getBalance(source.member.id, state)
+
+        var placeholders = { "$item" : opts.getText('item'), "$balance" : balance, "$outstanding" : opts.getNumber('price')-balance };
+
+        if(purchase == undefined || opts.getBoolean("repeatable")) {
+            if(balance >= opts.getNumber('price')) {
+                state.db.run('UPDATE users SET balance = ? WHERE id = ?', balance-opts.getNumber('price'), source.member.id);
+                await state.db.run('INSERT INTO purchases (userid, item) VALUES (?, ?)', source.member.id, opts.getText('item'));
+                source.channel.send(replacePlaceholders(opts.getText('text_success'), placeholders))
+
+                if (await state.config.has('purchases')) {
+            
+                    if (!source.member) return // Not a member of the server
+        
+                    console.log(chalk.cyan(`@${source.member.displayName} purchased: ${opts.getText('item')}`))
+        
+                    var purchaseConfig = (await state.config.get('purchases')).find(pch => {
+                        const [ itemName ] = pch.item.split(' ') // TODO: parse properly
+                        return itemName === opts.getText('item')
+                    })
+
+                    if(purchaseConfig) {
+                        await state.executeActionChain(purchaseConfig.actions, {
+                            message: source.message,
+                            channel: source.channel,
+                            member: source.member,
+                            command: source.command,
+                        })
+                    }
+                }
+            } else {
+                source.channel.send(replacePlaceholders(opts.getText('text_poor'), placeholders))
+            }
+        } else {
+            source.channel.send(replacePlaceholders(opts.getText('text_duplicate'), placeholders))
+        }
+    },
+
+    async GIVE_COINS(source, opts, state) {
+        var balance = await getBalance(source.member.id, state)
+        state.db.run('UPDATE users SET balance = ? WHERE id = ?', balance+opts.getNumber('amount'), source.member.id);
+
+        if(opts.getText('text')) {
+            var placeholders = { "$amount" : opts.getNumber('amount') };
+            source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
+        }
+    },
 }
+
+const replacePlaceholders = (str, placeholders) => {
+    Object.keys(placeholders).forEach((p) => {
+        var re = new RegExp(RegExp.quote(p),"g")
+        str = str.replace(re, placeholders[p]);
+    });
+    return str;
+}
+RegExp.quote = function(str) {
+    return str.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1");
+};
 
 const escapeMarkdown = s => s.replace(/([\[\]\(\)])/g, '\\$&')
 
@@ -106,4 +175,14 @@ const fileExtension = url => {
     if (!url) return
 
     return url.split('.').pop().split(/\#|\?/)[0]
+}
+
+const getBalance = async (id, state) => {
+    var balance = await state.db.get('SELECT * FROM users WHERE id = ?', id);
+    if(balance == undefined || isNaN(balance.balance)) {
+        await state.db.run('INSERT INTO users (id, balance) VALUES (?, ?)', id, (await state.config.get('economy')).starting_coins);
+    }
+    balance = await state.db.get('SELECT * FROM users WHERE id = ?', id);
+
+    return balance.balance
 }
