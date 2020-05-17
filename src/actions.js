@@ -170,8 +170,8 @@ module.exports = {
             source.member.id,
         )
 
-        if (opts.getText('text')) {
-            source.channel.send(opts.getText('text'), placeholders)
+        if (opts.has('text')) {
+            source.channel.send(handlePlaceholders(opts.getText('text'), placeholders))
         }
     },
 }

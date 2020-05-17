@@ -1,5 +1,5 @@
 const chalk = require('chalk')
-const { getBalance, checkCooldown, timeObjToMs } = require('./util.js')
+const { strToEmoji, getBalance, checkCooldown, timeObjToMs } = require('./util.js')
 
 module.exports = {
     // Skips the action if the source user does not have the given role (option: 'role').
@@ -13,7 +13,7 @@ module.exports = {
     // to allow ex-boosters of n months ago to pass this condition too.
     async IS_NITRO_BOOSTER(source, opts) {
         const ONE_MONTH = 2629800000
-        let timeRequired = (opts.months || 1) * ONE_MONTH
+        let timeRequired = (opts.has('months') ? opts.getNumber('months') : 1) * ONE_MONTH
 
         return Date.now() - source.member.premiumSince < timeRequired
     },
@@ -99,7 +99,53 @@ module.exports = {
             }
             return role != undefined
         }
+        if (opts.getText('value') == 'Emoji') {
+            strToEmoji(target)
+            return emoji != undefined
+        }
         // Type is not handled
         throw `type ${opts.getText('value')} is not supported`
+    },
+    async WAIT_FOR_REACTION(source, opts, state) {
+        const emoji = strToEmoji(opts.getText('emoji'))
+        if (opts.getBoolean('prompt')) {
+            source.message.react(emoji)
+        }
+        const filter = (reaction, user) =>
+            reaction.emoji.name == emoji && user.id === source.member.id
+        return new Promise(resolve => {
+            let timeLimit
+            try {
+                timeLimit = timeObjToMs(opts.getText('time'))
+            } catch (e) {
+                timeLimit = 15000
+            }
+            if (
+                source.message.reactions.cache.find(
+                    reaction =>
+                        reaction.emoji.name == emoji &&
+                        reaction.users.cache.some(user => user.id === source.member.id),
+                )
+            ) {
+                resolve(true)
+            }
+            console.log(timeLimit)
+            if (timeLimit == 0) {
+                resolve(
+                    source.message.reactions.cache.find(
+                        reaction =>
+                            reaction.emoji.name == emoji &&
+                            reaction.users.cache.some(user => user.id === source.member.id),
+                    ),
+                )
+            }
+            const collector = source.message.createReactionCollector(filter, { time: timeLimit })
+            collector.on('collect', r => {
+                resolve(true)
+            })
+            collector.on('end', collected => {
+                if (collected.size == 0) resolve(false)
+            })
+        })
     },
 }
