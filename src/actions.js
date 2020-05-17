@@ -4,7 +4,7 @@ const { replacePlaceholders, attachmentType, escapeMarkdown, getBalance } = requ
 module.exports = {
     // Sends a message (option: 'text') to the source channel.
     async REPLY(source, opts) {
-        await source.channel.send(replacePlaceholders(opts.getText('text'), opts))
+        await source.channel.send(opts.getText('text'))
     },
 
     // Sends a DM (option: 'text') to the source user.
@@ -110,7 +110,6 @@ module.exports = {
         const balance = await getBalance(source.member.id, state)
 
         const placeholders = {
-            $item: opts.getText('item'),
             $balance: balance,
             $outstanding: opts.getNumber('price') - balance,
         }
@@ -122,11 +121,13 @@ module.exports = {
                     balance - opts.getNumber('price'),
                     source.member.id,
                 )
-                await state.db.run(
-                    'INSERT INTO purchases (userid, item) VALUES (?, ?)',
-                    source.member.id,
-                    opts.getText('item'),
-                )
+                if (purchase == undefined) {
+                    await state.db.run(
+                        'INSERT INTO purchases (userid, item) VALUES (?, ?)',
+                        source.member.id,
+                        opts.getText('item'),
+                    )
+                }
                 source.channel.send(replacePlaceholders(opts.getText('text_success'), placeholders))
 
                 if (await state.config.has('purchases')) {
@@ -162,6 +163,7 @@ module.exports = {
 
     async GIVE_COINS(source, opts, state) {
         const balance = await getBalance(source.member.id, state)
+        const placeholders = { $balance: balance }
         state.db.run(
             'UPDATE users SET balance = ? WHERE id = ?',
             balance + opts.getNumber('amount'),
@@ -169,8 +171,7 @@ module.exports = {
         )
 
         if (opts.getText('text')) {
-            const placeholders = { $amount: opts.getNumber('amount') }
-            source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
+            source.channel.send(opts.getText('text'), placeholders)
         }
     },
 }

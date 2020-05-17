@@ -105,9 +105,9 @@ usage = "buy_taco"
     item = "Taco"
     repeatable = true
     price = 2
-    # Placeholders: $item, $balance, $outstanding, $transaction
-    text_success = "Successfully purchased $item, new balance: $balance"
-    text_poor = "Not enough coins to purchase $item, you need $outstanding more"
+    # Placeholders: $balance, $outstanding
+    text_success = "Successfully purchased $_item, new balance: $balance"
+    text_poor = "Not enough coins to purchase $_item, you need $outstanding more"
     text_duplicate = "You already have that item" # Only used when `repeatable = false`
 
 [[purchases]]
@@ -123,8 +123,8 @@ usage = "daily"
 
     [[commands.actions]]
     type = "GIVE_COINS"
-    amount = "50"
-    text = "You have claimed your $amount daily coins"
+    amount = 50
+    text = "You have claimed your $_amount daily coins"
     when = { type = 'TIME_SINCE', time = { days = 1 }, count_use = false }
 
     [[commands.actions]]

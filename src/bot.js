@@ -7,7 +7,7 @@ const sql = require('sql-template-strings')
 const shortEmoji = require('emoji-to-short-name')
 
 const config = require('./config.js')
-const { sleep, userHasItem } = require('./util.js')
+const { handlePlaceholders, sleep, userHasItem } = require('./util.js')
 const actionFunctions = require('./actions.js')
 const conditionFunctions = require('./conditions.js')
 const { version } = require('../package.json')
@@ -84,6 +84,7 @@ client.on('message', async msg => {
                 channel: msg.channel,
                 member: msg.member,
                 command: null,
+                args: [],
             })
         } else {
             const member = msg.member || (await guild.fetchMember(msg.author))
@@ -100,6 +101,7 @@ client.on('message', async msg => {
                 channel: msg.channel,
                 member: member,
                 command: commandString,
+                args: args.filter(el => el != ''),
             })
         }
     }
@@ -116,6 +118,7 @@ client.on('guildMemberAdd', async member => {
         channel: null,
         member: member,
         command: null,
+        args: [],
     })
 })
 
@@ -171,6 +174,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
                     channel: reaction.message.channel,
                     member,
                     command: null,
+                    args: [],
                 })
             }
         }
@@ -200,6 +204,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
                     channel: reaction.message.channel,
                     member,
                     command: null,
+                    args: [],
                 })
             }
         }
@@ -235,6 +240,7 @@ async function handlePossiblePin(reaction) {
                 channel: reaction.message.channel,
                 member: reaction.message.member,
                 command: null,
+                args: [],
             })
         }
     }
@@ -249,19 +255,20 @@ async function executeActionChain(actions, source) {
     }
 
     for (let idx = 0; idx < actions.length; idx++) {
-        const action = actions[idx]
+        let action = JSON.parse(JSON.stringify(actions[idx]))
 
         if (action.modifiers) {
             for (let i = 0; i < Object.keys(action.modifiers).length; i++) {
                 let mod = action.modifiers[Object.keys(action.modifiers)[i]]
 
-                if (await userHasItem(source.member.id, mod.item)) {
+                if (await userHasItem(source.member.id, mod.item, db)) {
                     for (key in mod.options) {
                         action[key] = mod.options[key]
                     }
                 }
             }
         }
+        action = placeholdersInOpts(action, source)
 
         process.stdout.write(chalk.grey(` ${idx + 1}. ${action.type}`))
 
@@ -361,6 +368,14 @@ function makeResolvable(map) {
     }
 
     return {
+        getKeys() {
+            return Object.keys(map)
+        },
+
+        getString(key) {
+            return safeToString(resolveKey(key))
+        },
+
         // Resolves to a string intended as message content.
         getText(key) {
             const value = resolveKey(key)
@@ -371,6 +386,7 @@ function makeResolvable(map) {
         },
 
         getNumber(key) {
+            if (isNaN(+resolveKey(key))) throw `'${key}' is not a number`
             return +resolveKey(key)
         },
 
@@ -442,6 +458,37 @@ function makeResolvable(map) {
             return emoji.name
         },
     }
+}
+
+function safeToString(x) {
+    switch (typeof x) {
+        case 'object':
+            return '[Object object]'
+        case 'function':
+            return '[Function function]'
+        default:
+            return x + ''
+    }
+}
+
+const placeholdersInOpts = (opts, source) => {
+    const newOpts = opts
+    for (key in opts) {
+        if (typeof opts[key] == 'string') {
+            newOpts[key] = handlePlaceholders(opts[key], { opts: opts, source: source })
+        }
+        if (typeof opts[key] == 'number') {
+            newOpts[key] = Number(
+                handlePlaceholders(opts[key].toString(), { opts: opts, source: source }),
+            )
+        }
+        if (typeof opts[key] == 'object') {
+            newOpts[key] = JSON.parse(
+                placeholdersInOpts(JSON.stringify(opts[key]), { opts: opts, source: source }),
+            )
+        }
+    }
+    return newOpts
 }
 
 process.on('unhandledRejection', error => {
