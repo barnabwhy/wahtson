@@ -131,3 +131,11 @@ usage = "daily"
     type = "REPLY"
     text = "You have to wait until tomorrow to use `!daily` again"
     when = { type = 'TIME_SINCE', time = { days = 1 }, negate = true }
+
+[[commands]]
+usage = "help"
+hidden = true
+
+    [[commands.actions]]
+    type = "SEND_HELP"
+    page = "$arg0"

@@ -252,6 +252,7 @@ async function executeActionChain(actions, source) {
         db: db,
         config: config,
         executeActionChain: executeActionChain,
+        avatar: client.user.displayAvatarURL(),
     }
 
     for (let idx = 0; idx < actions.length; idx++) {
