@@ -162,4 +162,11 @@ module.exports = {
     async RANDOM_CHANCE(source, opts, state) {
         return Math.random() * 100 < opts.getNumber('percent')
     },
+    async WAIT(source, opts, state) {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                resolve(true)
+            }, timeObjToMs(opts.getText('time')))
+        })
+    },
 }
