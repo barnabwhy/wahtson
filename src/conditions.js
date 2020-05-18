@@ -148,4 +148,7 @@ module.exports = {
             })
         })
     },
+    async RANDOM_CHANCE(source, opts, state) {
+        return Math.random() * 100 < opts.getNumber('percent')
+    },
 }
