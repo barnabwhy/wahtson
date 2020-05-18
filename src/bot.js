@@ -248,7 +248,7 @@ async function handlePossiblePin(reaction) {
 
 async function executeActionChain(actions, source) {
     let state = {
-        previousActionSkipped: false,
+        previousActionsSkipped: [false],
         db: db,
         config: config,
         executeActionChain: executeActionChain,
@@ -307,7 +307,7 @@ async function executeActionChain(actions, source) {
 
             if (!conditionsOk) {
                 console.log(chalk.magenta(' skipped'))
-                state.previousActionSkipped = true
+                state.previousActionsSkipped.push(true)
                 continue
             }
         }
@@ -325,7 +325,7 @@ async function executeActionChain(actions, source) {
             console.error(chalk.red(` error: ${err}`))
         })
 
-        state.previousActionSkipped = false
+        state.previousActionsSkipped.push(false)
     }
 }
 

@@ -264,4 +264,7 @@ module.exports = {
             })
         }
     },
+    async DO_NOTHING() {
+        /* DOES NOTHING, NOT A BUG. INTENDED FOR ACTION LOGIC PURPOSES. */
+    },
 }

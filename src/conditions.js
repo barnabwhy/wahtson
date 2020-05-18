@@ -19,7 +19,13 @@ module.exports = {
     },
 
     async PREVIOUS_ACTION_SKIPPED(source, opts, state) {
-        return state.previousActionSkipped
+        if (opts.has('ago')) {
+            return state.previousActionsSkipped[
+                state.previousActionsSkipped.length - opts.getNumber('ago')
+            ]
+        } else {
+            return state.previousActionsSkipped[state.previousActionsSkipped.length - 1]
+        }
     },
 
     async REQUIRE_COINS(source, opts, state) {
@@ -61,8 +67,13 @@ module.exports = {
         return source.args.length >= (await opts.getNumber('length'))
     },
     async ARG_EQUALS(source, opts, state) {
-        var target = source.args[opts.getNumber('index')]
-        return target != undefined && target == opts.getText('value')
+        const argument = source.args[opts.getNumber('index')]
+        const target = opts.getText('value')
+        if (opts.getBoolean('nocase')) {
+            return target != undefined && argument.toLowerCase() == target.toLowerCase()
+        } else {
+            return target != undefined && argument == target
+        }
     },
     async ARG_TYPE(source, opts, state) {
         var target = source.args[opts.getNumber('index')]
