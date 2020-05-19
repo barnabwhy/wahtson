@@ -78,7 +78,8 @@ client.on('message', async msg => {
         const { commandAttempted, commandString, commandConfig, args } = await parseMessage(msg)
 
         if (!commandAttempted) {
-            const member = msg.member || (await guild.fetchMember(msg.author))
+            const member = msg.member || (await guild.members.fetch(msg.author))
+            if (!(await config.has('on_message'))) return
             await executeActionChain(await config.get('on_message'), {
                 message: msg,
                 channel: msg.channel,
@@ -87,7 +88,7 @@ client.on('message', async msg => {
                 args: [],
             })
         } else {
-            const member = msg.member || (await guild.fetchMember(msg.author))
+            const member = msg.member || (await guild.members.fetch(msg.author))
 
             if (!member) return // Not a member of the server
 

@@ -177,7 +177,7 @@ module.exports = {
         )
 
         if (opts.has('text')) {
-            source.channel.send(handlePlaceholders(opts.getText('text'), placeholders))
+            source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
         }
     },
 
