@@ -58,6 +58,7 @@ module.exports = {
             opts.cooldown_group || source.command,
             state,
             await opts.getBoolean('count_use', true),
+            timeRequired,
         )
 
         return Date.now() - lastUsed > timeRequired
@@ -140,7 +141,7 @@ module.exports = {
             ) {
                 resolve(true)
             }
-            console.log(timeLimit)
+
             if (timeLimit == 0) {
                 resolve(
                     source.message.reactions.cache.find(

@@ -1,4 +1,3 @@
-const chalk = require('chalk')
 const {
     uniqueArray,
     replacePlaceholders,
@@ -138,12 +137,6 @@ module.exports = {
 
                 if (await state.config.has('purchases')) {
                     if (!source.member) return // Not a member of the server
-
-                    console.log(
-                        chalk.cyan(
-                            `@${source.member.displayName} purchased: ${opts.getText('item')}`,
-                        ),
-                    )
 
                     const purchaseConfig = (await state.config.get('purchases')).find(pch => {
                         const [itemName] = pch.item.split(' ') // TODO: parse properly

@@ -22,13 +22,13 @@ const timeObjToMs = timeObj => {
     return ms
 }
 
-const checkCooldown = async (userid, cooldownid, state, count_use) => {
+const checkCooldown = async (userid, cooldownid, state, count_use, timeRequired) => {
     const cooldown = await state.db.get(
         'SELECT * FROM cooldowns WHERE userid = ? AND cooldownid = ?',
         userid,
         cooldownid,
     )
-    if (count_use) {
+    if (count_use && Date.now() - cooldown.date > timeRequired) {
         if (cooldown == undefined || isNaN(cooldown.date)) {
             await state.db.run(
                 'INSERT INTO cooldowns (userid, cooldownid, date) VALUES (?, ?, ?)',
@@ -129,6 +129,25 @@ const replaceOptsPlaceholders = (str, opts) => {
     })
     return str
 }
+const placeholdersInOpts = (opts, source) => {
+    const newOpts = opts
+    for (key in opts) {
+        if (typeof opts[key] == 'string') {
+            newOpts[key] = handlePlaceholders(opts[key], { opts: opts, source: source })
+        }
+        if (typeof opts[key] == 'number') {
+            newOpts[key] = Number(
+                handlePlaceholders(opts[key].toString(), { opts: opts, source: source }),
+            )
+        }
+        if (typeof opts[key] == 'object') {
+            newOpts[key] = JSON.parse(
+                placeholdersInOpts(JSON.stringify(opts[key]), { opts: opts, source: source }),
+            )
+        }
+    }
+    return newOpts
+}
 
 const replacePlaceholders = (str, placeholders) => {
     Object.keys(placeholders).forEach(p => {
@@ -178,6 +197,8 @@ module.exports = {
     safeToString,
     handlePlaceholders,
     replacePlaceholders,
+    placeholdersInOpts,
+
     escapeMarkdown,
     attachmentType,
 

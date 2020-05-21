@@ -1,3 +1,0 @@
-#!/bin/bash
-npm install --silent
-node src/bot.js

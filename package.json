@@ -1,15 +1,24 @@
 {
   "name": "wahtson",
+  "description": "highly configurable discord bot",
   "version": "1.2.1",
+  "bin": "bin/wahtson.js",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nanaian/wahtson.git"
+  },
+  "homepage": "https://github.com/nanaian/wahtson",
   "main": "src/bot.js",
   "scripts": {
     "start": "node .",
-    "lint": "prettier --single-quote --trailing-comma all --no-semi --arrow-parens avoid --print-width 100 --tab-width 4 --write src/**/*.js"
+    "lint": "prettier --single-quote --trailing-comma all --no-semi --arrow-parens avoid --print-width 100 --tab-width 4 --write src/**/*.js bin/**/*.js"
   },
   "dependencies": {
     "chalk": "^4.0.0",
     "discord.js": "^12.2.0",
     "emoji-to-short-name": "^1.0.1",
+    "minimist": "^1.2.5",
     "open": "^7.0.3",
     "sql-template-strings": "^2.2.2",
     "sqlite": "^4.0.7",
