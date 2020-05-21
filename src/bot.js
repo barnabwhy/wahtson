@@ -433,9 +433,9 @@ module.exports = class Bot extends EventEmitter {
 
     async handlePossiblePin(reaction) {
         const pinConfig = await this.config.get('pin')
-        const opts = makeResolvable(pinConfig)
+        const opts = this.makeResolvable(pinConfig)
 
-        const { getChannel: getDisallowChannel } = makeResolvable(pinConfig.disallow_from)
+        const { getChannel: getDisallowChannel } = this.makeResolvable(pinConfig.disallow_from)
         for (let i = 0; i < pinConfig.disallow_from.length; i++) {
             const channel = getDisallowChannel(0)
 
