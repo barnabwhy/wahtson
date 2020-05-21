@@ -4,7 +4,6 @@ const sqlite = require('sqlite')
 const { Database } = require('sqlite3')
 const sql = require('sql-template-strings')
 const shortEmoji = require('emoji-to-short-name')
-const path = require('path')
 
 const config = require('./config.js')
 const { safeToString, placeholdersInOpts, sleep, userHasItem } = require('./util.js')
