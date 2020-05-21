@@ -58,7 +58,7 @@ module.exports = class Bot extends EventEmitter {
                     if (!commandAttempted) {
                         const member = msg.member || (await this.guild.members.fetch(msg.author))
                         if (!(await this.config.has('on_message'))) return
-                        await executeActionChain(await this.config.get('on_message'), {
+                        await this.executeActionChain(await this.config.get('on_message'), {
                             event_call: 'on_message',
                             message: msg,
                             channel: msg.channel,
@@ -116,7 +116,7 @@ module.exports = class Bot extends EventEmitter {
                     text: `@${member.displayName} joined`,
                 })
 
-                await executeActionChain(await this.config.get('on_new_member'), {
+                await this.executeActionChain(await this.config.get('on_new_member'), {
                     event_call: 'on_new_member',
                     message: null,
                     channel: null,
@@ -334,8 +334,8 @@ module.exports = class Bot extends EventEmitter {
         let state = {
             previousActionsSkipped: [false],
             db: this.db,
-            config,
-            executeActionChain: executeActionChain,
+            config: this.config,
+            executeActionChain: this.executeActionChain,
             avatar: this.client.user.displayAvatarURL(),
         }
 
@@ -576,7 +576,7 @@ module.exports = class Bot extends EventEmitter {
             promiseFn(...args).catch(err => {
                 this.emit('log', {
                     level: Bot.logLevel.ERROR,
-                    text: err.toString(),
+                    text: err.stack.toString(),
                 })
             })
     }
