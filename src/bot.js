@@ -4,6 +4,7 @@ const sqlite = require('sqlite')
 const { Database } = require('sqlite3')
 const sql = require('sql-template-strings')
 const shortEmoji = require('emoji-to-short-name')
+const path = require('path')
 
 const config = require('./config.js')
 const { safeToString, placeholdersInOpts, sleep, userHasItem } = require('./util.js')
@@ -250,7 +251,9 @@ module.exports = class Bot extends EventEmitter {
             filename: this.botOptions.dbPath,
             driver: Database,
         })
-        await this.db.migrate()
+        await this.db.migrate({
+            migrationsPath: path.join(__dirname, '..', 'migrations'),
+        })
 
         const p = new Promise((resolve, reject) => {
             this.client.once('ready', async () => {
@@ -541,6 +544,33 @@ module.exports = class Bot extends EventEmitter {
                 }
 
                 return channel
+            },
+
+            // Resolves to a GuildMember by name#discrim or id (DM).
+            getMember: key => {
+                const raw = resolveKey(key)
+
+                let member
+                const re = /^(.)+\#([0-9]){4}$/g
+                if (raw.match(re)) {
+                    // By name
+                    const memberParts = raw.split('#')
+
+                    member = this.guild.members.cache.find(
+                        m =>
+                            m.user.username === memberParts[0] &&
+                            m.user.discriminator == memberParts[1],
+                    )
+                } else {
+                    // By ID
+                    member = this.guild.members.cache.find(m => m.id === raw)
+                }
+
+                if (!member) {
+                    throw `unable to resolve member '${raw}'`
+                }
+
+                return member
             },
 
             // Resolves an emoji to its Emoji#name. Enclosing colons are optional.
