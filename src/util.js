@@ -28,7 +28,11 @@ const checkCooldown = async (userid, cooldownid, state, count_use, timeRequired)
         userid,
         cooldownid,
     )
-    if (count_use && Date.now() - cooldown.date > timeRequired) {
+    if (
+        cooldown == undefined ||
+        isNaN(cooldown.date) ||
+        (count_use && Date.now() - cooldown.date > timeRequired)
+    ) {
         if (cooldown == undefined || isNaN(cooldown.date)) {
             await state.db.run(
                 'INSERT INTO cooldowns (userid, cooldownid, date) VALUES (?, ?, ?)',

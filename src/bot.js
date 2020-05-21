@@ -451,7 +451,7 @@ module.exports = class Bot extends EventEmitter {
             ))
 
             if (!isPinned) {
-                await db.run(sql`INSERT INTO pins VALUES (${reaction.message.id})`)
+                await this.db.run(sql`INSERT INTO pins VALUES (${reaction.message.id})`)
 
                 await this.executeActionChain(pinConfig.actions, {
                     event_call: 'pin',
@@ -475,20 +475,18 @@ module.exports = class Bot extends EventEmitter {
         }
 
         return {
-            getKeys() {
-                return Object.keys(map)
-            },
+            getKeys: () => Object.keys(map),
 
-            has(key) {
+            has: key => {
                 return map.hasOwnProperty(key)
             },
 
-            getString(key) {
+            getString: key => {
                 return safeToString(resolveKey(key))
             },
 
             // Resolves to a string intended as message content.
-            getText(key) {
+            getText: key => {
                 const value = resolveKey(key)
 
                 // TODO: text parsing (variable substitution, #channel resolution, etc)
@@ -496,12 +494,12 @@ module.exports = class Bot extends EventEmitter {
                 return value
             },
 
-            getNumber(key) {
+            getNumber: key => {
                 if (isNaN(+resolveKey(key))) throw `'${key}' is not a number`
                 return +resolveKey(key)
             },
 
-            getBoolean(key, defaultVal = false) {
+            getBoolean: (key, defaultVal = false) => {
                 try {
                     return resolveKey(key)
                 } catch (e) {
@@ -510,7 +508,7 @@ module.exports = class Bot extends EventEmitter {
             },
 
             // Resolves to a Role by name or id.
-            getRole(key) {
+            getRole: key => {
                 const roleNameOrId = resolveKey(key)
                 const role = this.guild.roles.cache.find(role => {
                     return role.name === roleNameOrId || role.id === roleNameOrId
@@ -524,7 +522,7 @@ module.exports = class Bot extends EventEmitter {
             },
 
             // Resolves to a TextChannel by #name or id (DM).
-            getChannel(key) {
+            getChannel: key => {
                 const raw = resolveKey(key)
 
                 let channel
@@ -546,7 +544,7 @@ module.exports = class Bot extends EventEmitter {
             },
 
             // Resolves an emoji to its Emoji#name. Enclosing colons are optional.
-            getEmoji(key) {
+            getEmoji: key => {
                 const maybeWithColons = resolveKey(key)
                 const withoutColons = maybeWithColons.startsWith(':')
                     ? maybeWithColons.substr(1, maybeWithColons.length - 2)
