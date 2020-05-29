@@ -353,7 +353,7 @@ module.exports = class Bot extends EventEmitter {
         }
         //Parsing multi options for global placeholders (done here so that they are unique to each event call)
         let globalPlaceholders = {}
-        if (state.config.has('placeholders')) {
+        if (await state.config.has('placeholders')) {
             globalPlaceholders = JSON.parse(JSON.stringify(await state.config.get('placeholders')))
             for (const [key, value] of Object.entries(globalPlaceholders)) {
                 globalPlaceholders[key] = multiOption(value)
