@@ -7,7 +7,7 @@ const shortEmoji = require('emoji-to-short-name')
 const path = require('path')
 
 const config = require('./config.js')
-const { safeToString, placeholdersInOpts, sleep, userHasItem } = require('./util.js')
+const { safeToString, placeholdersInOpts, multiOption, sleep, userHasItem } = require('./util.js')
 const actionFunctions = require('./actions.js')
 const conditionFunctions = require('./conditions.js')
 const { version } = require('../package.json')
@@ -65,7 +65,7 @@ module.exports = class Bot extends EventEmitter {
                             channel: msg.channel,
                             member: msg.member,
                             command: null,
-                            limitLog: (await this.config.get('on_message')).limit_log,
+                            eventConfig: await this.config.get('on_message'),
                             args: [],
                         })
                     } else {
@@ -85,7 +85,7 @@ module.exports = class Bot extends EventEmitter {
                                 channel: msg.channel,
                                 member: member,
                                 command: commandString,
-                                limitLog: commandConfig.limit_log,
+                                eventConfig: await commandConfig,
                                 args: args.filter(el => el != ''),
                             })
                         } else if (await this.config.has('on_unknown_command')) {
@@ -97,6 +97,7 @@ module.exports = class Bot extends EventEmitter {
                                     channel: msg.channel,
                                     member: member,
                                     command: commandString,
+                                    eventConfig: await this.config.get('on_unknown_command'),
                                     args: args.filter(el => el != ''),
                                 },
                             )
@@ -123,6 +124,7 @@ module.exports = class Bot extends EventEmitter {
                     channel: null,
                     member,
                     command: null,
+                    eventConfig: await this.config.get('on_new_member'),
                     args: [],
                 })
             }),
@@ -200,6 +202,7 @@ module.exports = class Bot extends EventEmitter {
                                 channel: reaction.message.channel,
                                 member,
                                 command: null,
+                                eventConfig: await rConfig,
                                 args: [],
                             })
                         }
@@ -237,6 +240,7 @@ module.exports = class Bot extends EventEmitter {
                                 channel: reaction.message.channel,
                                 member,
                                 command: null,
+                                eventConfig: await rConfig,
                                 args: [],
                             })
                         }
@@ -342,6 +346,20 @@ module.exports = class Bot extends EventEmitter {
             avatar: this.client.user.displayAvatarURL(),
         }
 
+        //Parsing multi options for the event (done here so that they are unique to each event call)
+        let eventConfig = JSON.parse(JSON.stringify(source.eventConfig))
+        for (const [key, value] of Object.entries(eventConfig)) {
+            eventConfig[key] = multiOption(value)
+        }
+        //Parsing multi options for global placeholders (done here so that they are unique to each event call)
+        let globalPlaceholders = {}
+        if (state.config.has('placeholders')) {
+            globalPlaceholders = JSON.parse(JSON.stringify(await state.config.get('placeholders')))
+            for (const [key, value] of Object.entries(globalPlaceholders)) {
+                globalPlaceholders[key] = multiOption(value)
+            }
+        }
+
         for (let idx = 0; idx < actions.length; idx++) {
             let action = JSON.parse(JSON.stringify(actions[idx]))
 
@@ -356,7 +374,13 @@ module.exports = class Bot extends EventEmitter {
                     }
                 }
             }
-            action = await placeholdersInOpts(action, source)
+
+            //Parsing multi options for the action (done here so that they are unique to each event call)
+            for (const [key, value] of Object.entries(action)) {
+                action[key] = multiOption(value)
+            }
+
+            action = await placeholdersInOpts(action, source, eventConfig, globalPlaceholders)
 
             if (action.when) {
                 const conditions = Array.isArray(action.when) ? action.when : [action.when]
@@ -462,6 +486,7 @@ module.exports = class Bot extends EventEmitter {
                     channel: reaction.message.channel,
                     member: reaction.message.member,
                     command: null,
+                    eventConfig: await pinConfig,
                     args: [],
                 })
             }
@@ -483,6 +508,8 @@ module.exports = class Bot extends EventEmitter {
             has: key => {
                 return map.hasOwnProperty(key)
             },
+
+            getRaw: key => map[key],
 
             getString: key => {
                 return safeToString(resolveKey(key))

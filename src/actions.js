@@ -8,19 +8,35 @@ const {
 
 module.exports = {
     async SEND_TO_CHANNEL(source, opts) {
-        await opts.getChannel('to').send(opts.getText('text'))
+        await opts.getChannel('to').send({
+            content: opts.has('text') ? opts.getText('text') : '',
+            embed: opts.has('embed') ? opts.getRaw('embed') : undefined,
+            files: opts.has('files') ? opts.getRaw('files') : undefined,
+        })
     },
     async SEND_TO_USER(source, opts) {
-        await opts.getMember('to').send(opts.getText('text'))
+        await opts.getMember('to').send({
+            content: opts.has('text') ? opts.getText('text') : '',
+            embed: opts.has('embed') ? opts.getRaw('embed') : undefined,
+            files: opts.has('files') ? opts.getRaw('files') : undefined,
+        })
     },
     // Sends a message (option: 'text') to the source channel.
     async REPLY(source, opts) {
-        await source.channel.send(opts.getText('text'))
+        await source.channel.send({
+            content: opts.has('text') ? opts.getText('text') : '',
+            embed: opts.has('embed') ? opts.getRaw('embed') : undefined,
+            files: opts.has('files') ? opts.getRaw('files') : undefined,
+        })
     },
 
     // Sends a DM (option: 'text') to the source user.
     async REPLY_DM(source, opts) {
-        await source.member.send(opts.getText('text'))
+        await source.member.send({
+            content: opts.has('text') ? opts.getText('text') : '',
+            embed: opts.has('embed') ? opts.getRaw('embed') : undefined,
+            files: opts.has('files') ? opts.getRaw('files') : undefined,
+        })
     },
 
     // Grants a role (option: 'role') to the source member.
