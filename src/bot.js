@@ -400,7 +400,12 @@ module.exports = class Bot extends EventEmitter {
 
                     let ok
                     try {
-                        ok = await conditionFn(source, this.makeResolvable(condition), state)
+                        ok = await conditionFn(
+                            source,
+                            this.makeResolvable(condition),
+                            state,
+                            this.makeResolvable(action),
+                        )
                     } catch (err) {
                         this.emit('log', { level: Bot.logLevel.ERROR, text: err.toString() })
                         conditionsOk = false

@@ -76,14 +76,11 @@ module.exports = {
             return target != undefined && argument == target
         }
     },
-    async OPTION_EQUALS(source, opts, state) {
-        const option = opts.getRaw(opts.getText('key'))
-        const target = opts.getText('key')
-        if (opts.getBoolean('nocase')) {
-            return target != undefined && option.toLowerCase() == target.toLowerCase()
-        } else {
-            return target != undefined && option == target
-        }
+    async OPTION_EQUALS(source, opts, state, action) {
+        const target = await opts.getText('value')
+        const option = await action.getRaw(opts.getText('key'))
+        console.log(option)
+        return target != undefined && option == target
     },
     async ARG_TYPE(source, opts, state) {
         var target = source.args[opts.getNumber('index')]
