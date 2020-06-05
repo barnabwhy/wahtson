@@ -4,6 +4,9 @@ const {
     attachmentType,
     escapeMarkdown,
     getBalance,
+    timeObjToMs,
+    storeSchedule,
+    removeSchedule,
 } = require('./util.js')
 
 module.exports = {
@@ -123,8 +126,19 @@ module.exports = {
     },
 
     async GET_BALANCE(source, opts, state) {
-        const balance = await getBalance(source.member.id, state)
-        const placeholders = { $balance: balance }
+        const balance = await getBalance(
+            opts.has('user') && opts.getRaw('user') != ''
+                ? opts.getMember('user').id
+                : source.member.id,
+            state,
+        )
+        const placeholders = {
+            $balance: balance,
+            $user:
+                opts.has('user') && opts.getRaw('user') != ''
+                    ? opts.getMember('user')
+                    : source.member,
+        }
         source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
     },
 
@@ -167,10 +181,13 @@ module.exports = {
 
                     if (purchaseConfig) {
                         await state.executeActionChain(purchaseConfig.actions, {
+                            event_call: 'purchase',
                             message: source.message,
-                            channel: source.channel,
-                            member: source.member,
-                            command: source.command,
+                            channel: source.message.channel,
+                            member: source.message.member,
+                            command: null,
+                            eventConfig: opts,
+                            args: [],
                         })
                     }
                 }
@@ -281,5 +298,104 @@ module.exports = {
     },
     async DO_NOTHING() {
         /* DOES NOTHING, NOT A BUG. INTENDED FOR ACTION LOGIC PURPOSES. */
+    },
+
+    async TRANSFER_COINS(source, opts, state) {
+        const balanceFrom = await getBalance(opts.getMember('from').id, state)
+        const balanceTo = await getBalance(opts.getMember('to').id, state)
+
+        let decuction = opts.getNumber('amount')
+        if (opts.has('tax')) {
+            decuction += opts.getNumber('tax')
+        }
+
+        if (balanceFrom < decuction) {
+            if (opts.has('text_poor')) {
+                source.channel.send(opts.getText('text_poor'))
+            }
+        } else if (opts.getMember('to') === opts.getMember('from')) {
+            if (opts.has('text_self')) {
+                source.channel.send(opts.getText('text_self'))
+            }
+        } else {
+            state.db.run(
+                'UPDATE users SET balance = ? WHERE id = ?',
+                balanceFrom - decuction,
+                opts.getMember('from').id,
+            )
+            state.db.run(
+                'UPDATE users SET balance = ? WHERE id = ?',
+                balanceTo + opts.getNumber('amount'),
+                opts.getMember('to').id,
+            )
+
+            if (opts.has('text_success')) {
+                source.channel.send(opts.getText('text_success'))
+            }
+        }
+    },
+
+    async WEBHOOK(source, opts, state) {
+        const channel = opts.has('to') ? opts.getChannel('to') : source.channel
+        const webhookOpts = await state.config.get('webhook')
+        const webhookComponents = (opts.has('webhook_url')
+            ? opts.getText('webhook_url')
+            : webhookOpts.default_webhook_url
+        )
+            .replace('https://discordapp.com/api/webhooks/', '')
+            .split('/')
+        const webhook = await (await source.message.guild.fetchWebhooks()).get(webhookComponents[0])
+
+        await webhook.edit({
+            channel: channel.id,
+        })
+
+        webhook.send({
+            username: opts.has('display_name')
+                ? opts.getText('display_name')
+                : webhookOpts.default_display_name,
+            avatarURL: opts.has('avatar_url')
+                ? opts.getText('avatar_url')
+                : webhookOpts.default_avatar_url,
+
+            content: opts.has('text') ? opts.getText('text') : '',
+            embeds: opts.has('embeds') ? opts.getRaw('embeds') : [],
+        })
+    },
+
+    async SCHEDULE(source, opts, state, idx) {
+        const actions = await source.eventConfig.actions.slice(idx + 1)
+
+        let runTime = timeObjToMs(opts.getText('time'))
+
+        source.event_call = 'schedule'
+        source.eventConfig.actions = actions
+
+        await storeSchedule(
+            state.db,
+            actions,
+            source,
+            runTime,
+            opts.getBoolean('cancel_if_passed', true),
+        )
+
+        setTimeout(async () => {
+            state.executeActionChain(actions, source)
+
+            let compressedSource = JSON.parse(JSON.stringify(source))
+
+            compressedSource.channel = source.channel.id
+            compressedSource.member = source.member.id
+            compressedSource.message = source.message.id
+            compressedSource.isGuild = source.channel.guild != undefined
+
+            removeSchedule(state.db, {
+                actions,
+                compressedSource,
+                runTime,
+            })
+        }, runTime)
+
+        return false
     },
 }

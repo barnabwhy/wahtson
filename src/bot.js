@@ -7,7 +7,15 @@ const shortEmoji = require('emoji-to-short-name')
 const path = require('path')
 
 const config = require('./config.js')
-const { safeToString, placeholdersInOpts, multiOption, sleep, userHasItem } = require('./util.js')
+const {
+    safeToString,
+    placeholdersInOpts,
+    multiOption,
+    mathOption,
+    sleep,
+    userHasItem,
+    removeSchedule,
+} = require('./util.js')
 const actionFunctions = require('./actions.js')
 const conditionFunctions = require('./conditions.js')
 const { version } = require('../package.json')
@@ -63,7 +71,7 @@ module.exports = class Bot extends EventEmitter {
                             event_call: 'on_message',
                             message: msg,
                             channel: msg.channel,
-                            member: msg.member,
+                            member,
                             command: null,
                             eventConfig: await this.config.get('on_message'),
                             args: [],
@@ -220,7 +228,7 @@ module.exports = class Bot extends EventEmitter {
                 const member = await this.guild.members.fetch(user)
 
                 if (await this.config.has('reactions')) {
-                    for (const rConfig of await config.get('reactions')) {
+                    for (const rConfig of await this.config.get('reactions')) {
                         if (rConfig.message && rConfig.message !== reaction.message.id) {
                             continue
                         }
@@ -297,6 +305,42 @@ module.exports = class Bot extends EventEmitter {
                     level: Bot.logLevel.INFO,
                     text: 'Server found. Listening for commands...',
                 })
+
+                const schedules = await this.db.all('SELECT * FROM schedules')
+                for (const schedule of schedules) {
+                    let uncompressedSource = JSON.parse(schedule.source)
+                    if (uncompressedSource.cancelIfPassed && schedule.runTime < Date.now()) {
+                        removeSchedule(this.db, schedule)
+                        return
+                    }
+                    setTimeout(async () => {
+                        if (uncompressedSource.isGuild) {
+                            uncompressedSource.channel = this.guild.channels.resolve(
+                                uncompressedSource.channel,
+                            )
+                            uncompressedSource.member = this.guild.members.resolve(
+                                uncompressedSource.member,
+                            )
+                            uncompressedSource.message = await uncompressedSource.channel.messages.fetch(
+                                uncompressedSource.message,
+                            )
+                        } else {
+                            uncompressedSource.member = await this.client.users.fetch(
+                                uncompressedSource.member,
+                            )
+                            uncompressedSource.channel = await this.client.channels.fetch(
+                                uncompressedSource.channel,
+                            )
+                            uncompressedSource.message = await uncompressedSource.channel.messages.fetch(
+                                uncompressedSource.message,
+                            )
+                        }
+
+                        this.executeActionChain(JSON.parse(schedule.actions), uncompressedSource)
+                        removeSchedule(this.db, schedule)
+                    }, schedule.runTime - Date.now())
+                }
+
                 resolve()
             })
         })
@@ -337,7 +381,7 @@ module.exports = class Bot extends EventEmitter {
         }
     }
 
-    async executeActionChain(actions, source) {
+    executeActionChain = async (actions, source) => {
         let state = {
             previousActionsSkipped: [false],
             db: this.db,
@@ -346,18 +390,31 @@ module.exports = class Bot extends EventEmitter {
             avatar: this.client.user.displayAvatarURL(),
         }
 
-        //Parsing multi options for the event (done here so that they are unique to each event call)
-        let eventConfig = JSON.parse(JSON.stringify(source.eventConfig))
-        for (const [key, value] of Object.entries(eventConfig)) {
-            eventConfig[key] = multiOption(value)
-        }
-        //Parsing multi options for global placeholders (done here so that they are unique to each event call)
+        //Parsing options for global placeholders (done here so that they are unique to each event call)
         let globalPlaceholders = {}
         if (await state.config.has('placeholders')) {
             globalPlaceholders = JSON.parse(JSON.stringify(await state.config.get('placeholders')))
             for (const [key, value] of Object.entries(globalPlaceholders)) {
                 globalPlaceholders[key] = multiOption(value)
+                globalPlaceholders[key] = mathOption(value)
             }
+        }
+
+        //Parsing options for the event (done here so that they are unique to each event call)
+        let eventConfig = JSON.parse(JSON.stringify(source.eventConfig))
+        for (const [key, value] of Object.entries(eventConfig)) {
+            if (key === 'action') return
+            eventConfig[key] = multiOption(value)
+            eventConfig[key] = JSON.parse(
+                placeholdersInOpts(
+                    JSON.stringify(eventConfig[key]),
+                    eventConfig,
+                    source,
+                    eventConfig,
+                    globalPlaceholders,
+                ),
+            )
+            eventConfig[key] = mathOption(eventConfig[key])
         }
 
         for (let idx = 0; idx < actions.length; idx++) {
@@ -375,12 +432,20 @@ module.exports = class Bot extends EventEmitter {
                 }
             }
 
-            //Parsing multi options for the action (done here so that they are unique to each event call)
+            //Parsing multi options and math operators for the action (done here so that they are unique to each event call)
             for (const [key, value] of Object.entries(action)) {
                 action[key] = multiOption(value)
+                action[key] = JSON.parse(
+                    placeholdersInOpts(
+                        JSON.stringify(action[key]),
+                        action,
+                        source,
+                        eventConfig,
+                        globalPlaceholders,
+                    ),
+                )
+                action[key] = mathOption(action[key])
             }
-
-            action = await placeholdersInOpts(action, source, eventConfig, globalPlaceholders)
 
             if (action.when) {
                 const conditions = Array.isArray(action.when) ? action.when : [action.when]
@@ -405,6 +470,7 @@ module.exports = class Bot extends EventEmitter {
                             this.makeResolvable(condition),
                             state,
                             this.makeResolvable(action),
+                            action,
                         )
                     } catch (err) {
                         this.emit('log', { level: Bot.logLevel.ERROR, text: err.toString() })
@@ -446,9 +512,22 @@ module.exports = class Bot extends EventEmitter {
                 continue
             }
 
-            await fn(source, this.makeResolvable(action), state).catch(err => {
-                this.emit('log', { level: Bot.logLevel.ERROR, text: err.toString() })
-            })
+            let actionResult = await fn(source, this.makeResolvable(action), state, idx).catch(
+                err => {
+                    this.emit('log', { level: Bot.logLevel.ERROR, text: err.toString() })
+                },
+            )
+            if (actionResult === false) {
+                this.emit('action', {
+                    index: idx,
+                    action,
+                    skipped: false,
+                    numActions: idx + 1,
+                    source: source.message.id,
+                    event: source.event_call,
+                })
+                return
+            }
 
             state.previousActionsSkipped.push(false)
 
@@ -595,7 +674,11 @@ module.exports = class Bot extends EventEmitter {
                     )
                 } else {
                     // By ID
-                    member = this.guild.members.cache.find(m => m.id === raw)
+                    if (raw.startsWith('<@'))
+                        member = this.guild.members.cache.find(
+                            m => m.id === raw.replace('!', '').substring(2, 20),
+                        )
+                    else member = this.guild.members.cache.find(m => m.id === raw)
                 }
 
                 if (!member) {

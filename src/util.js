@@ -101,7 +101,7 @@ async function userHasItem(id, item, db) {
 }
 
 const handlePlaceholders = (str, objs = {}) => {
-    if (objs.source.args) str = replaceArgPlaceholders(str, objs.source.args)
+    if (objs.source && objs.source.args) str = replaceArgPlaceholders(str, objs.source.args)
     if (objs.source) str = replaceEventPlaceholders(str, objs.source)
 
     if (objs.globalPlaceholders) str = replaceOptsPlaceholders(str, objs.globalPlaceholders, '$g_')
@@ -117,6 +117,8 @@ const replaceArgPlaceholders = (str, args) => {
         const re = new RegExp(escapeRegexSpecialChars('$arg' + i), 'g')
         str = str.replace(re, args[i])
     }
+    const reSpares = new RegExp(escapeRegexSpecialChars('$arg') + '[0-9]+', 'g')
+    str = str.replace(reSpares, '')
     return str
 }
 
@@ -133,46 +135,46 @@ const replaceEventPlaceholders = (str, source) => {
 const replaceOptsPlaceholders = (str, opts, prefix = '$_') => {
     var keys = Object.keys(opts)
     keys.forEach(key => {
-        if (safeToString(opts[key]) == '[Object object]') return
         const re = new RegExp(escapeRegexSpecialChars(prefix + key), 'g')
-        str = str.replace(re, safeToString(opts[key]))
+        if (typeof opts[key] == 'object') {
+            str = str.replace(re, JSON.stringify(opts[key]))
+        } else {
+            str = str.replace(re, opts[key].toString())
+        }
     })
     return str
 }
 
-const placeholdersInOpts = (opts, source, eventConfig, globalPlaceholders) => {
-    const newOpts = opts
-    for (key in opts) {
-        if (typeof opts[key] == 'string') {
-            newOpts[key] = handlePlaceholders(opts[key].toString(), {
+const placeholdersInOpts = (val, opts, source, eventConfig, globalPlaceholders) => {
+    if (typeof val == 'string') {
+        val = handlePlaceholders(val.toString(), {
+            opts: opts,
+            source: source,
+            eventConfig: eventConfig,
+            globalPlaceholders: globalPlaceholders,
+        })
+    }
+    if (typeof val == 'number') {
+        val = Number(
+            handlePlaceholders(val.toString(), {
                 opts: opts,
                 source: source,
                 eventConfig: eventConfig,
                 globalPlaceholders: globalPlaceholders,
-            })
-        }
-        if (typeof opts[key] == 'number') {
-            newOpts[key] = Number(
-                handlePlaceholders(opts[key].toString(), {
-                    opts: opts,
-                    source: source,
-                    eventConfig: eventConfig,
-                    globalPlaceholders: globalPlaceholders,
-                }),
-            )
-        }
-        if (typeof opts[key] == 'object') {
-            newOpts[key] = JSON.parse(
-                handlePlaceholders(JSON.stringify(opts[key]), {
-                    opts: opts,
-                    source: source,
-                    eventConfig: eventConfig,
-                    globalPlaceholders: globalPlaceholders,
-                }),
-            )
-        }
+            }),
+        )
     }
-    return newOpts
+    if (typeof val == 'object') {
+        val = JSON.parse(
+            handlePlaceholders(JSON.stringify(val), {
+                opts: opts,
+                source: source,
+                eventConfig: eventConfig,
+                globalPlaceholders: globalPlaceholders,
+            }),
+        )
+    }
+    return val
 }
 
 const replacePlaceholders = (str, placeholders) => {
@@ -226,18 +228,110 @@ const multiOption = value => {
     return value
 }
 
+const mathOption = value => {
+    if (typeof value == 'object' && value.type == 'MATH') {
+        let operated = Number(value.input)
+        for (operator of value.operators) {
+            if (operator.type == 'ADD') operated += Number(operator.operand)
+            if (operator.type == 'SUBTRACT') operated -= Number(operator.operand)
+            if (operator.type == 'MULTIPLE') operated *= Number(operator.operand)
+            if (operator.type == 'DIVIDE') operated /= Number(operator.operand)
+            if (operator.type == 'FLOOR') operated = Math.floor(operated)
+            if (operator.type == 'CEILING') operated = Math.ceil(operated)
+            if (operator.type == 'ROUND') operated = Math.round(operated)
+        }
+        return operated
+    }
+    return value
+}
+
+const storeSchedule = async (db, actions, source, runTime, cancelIfPassed) => {
+    if (actions.length) {
+        let compressedSource = JSON.parse(JSON.stringify(source))
+
+        compressedSource.channel = source.channel.id
+        compressedSource.member = source.member.id
+        compressedSource.message = source.message.id
+        compressedSource.isGuild = source.channel.guild != undefined
+        compressedSource.cancelIfPassed = cancelIfPassed
+
+        await db.run(
+            'INSERT INTO schedules (actions, source, runTime) VALUES (?, ?, ?)',
+            JSON.stringify(actions),
+            JSON.stringify(compressedSource),
+            Date.now() + runTime,
+        )
+    }
+}
+const removeSchedule = async (db, schedule) => {
+    await db.run(
+        'DELETE FROM schedules WHERE actions = ? AND source = ? AND runTime = ?',
+        schedule.actions,
+        schedule.source,
+        schedule.runTime,
+    )
+}
+
+const timeDiffString = (first, last) => {
+    const diff = Math.round(first - last)
+
+    const CONV = {
+        YEAR: 31536000000,
+        MONTH: 2629800000,
+        DAY: 86400000,
+        HOUR: 3600000,
+        MINUTE: 60000,
+        SECOND: 1000,
+    }
+
+    let amount
+    let str
+
+    switch (true) {
+        case diff >= CONV.YEAR:
+            str = 'year'
+            amount = Math.round(diff / CONV.YEAR)
+            break
+        case diff >= CONV.MONTH:
+            str = 'month'
+            amount = Math.round(diff / CONV.MONTH)
+            break
+        case diff >= CONV.DAY:
+            str = 'day'
+            amount = Math.round(diff / CONV.DAY)
+            break
+        case diff >= CONV.HOUR:
+            str = 'hour'
+            amount = Math.round(diff / CONV.HOUR)
+            break
+        case diff >= CONV.MINUTE:
+            str = 'minute'
+            amount = Math.round(diff / CONV.MINUTE)
+            break
+        case diff >= CONV.SECOND:
+            str = 'second'
+            amount = Math.round(diff / CONV.SECOND)
+            break
+    }
+
+    return String(amount) + ' ' + str + (amount == 1 ? '' : 's')
+}
+
 module.exports = {
     sleep,
     timeObjToMs,
+    timeDiffString,
     checkCooldown,
     uniqueArray,
+    storeSchedule,
+    removeSchedule,
 
     strToEmoji,
     safeToString,
-    handlePlaceholders,
     replacePlaceholders,
     placeholdersInOpts,
     multiOption,
+    mathOption,
 
     escapeMarkdown,
     attachmentType,
