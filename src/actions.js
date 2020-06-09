@@ -256,7 +256,11 @@ module.exports = {
                                 return cmd.category == cat
                             })
                             if (catCmds.length > 3) {
-                                catCmds[3] = { usage: `**${catCmds.length - 3} more commands**` }
+                                catCmds[3] = {
+                                    usage: `**${catCmds.length - 3} more command${
+                                        catCmds.length > 3 ? 's' : ''
+                                    }**`,
+                                }
                                 catCmds = catCmds.slice(0, 4)
                             }
                             return {
