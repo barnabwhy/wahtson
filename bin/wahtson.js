@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const chalk = require('chalk')
 const fs = require('fs')
 const p = require('util').promisify
