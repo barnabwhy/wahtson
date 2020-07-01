@@ -402,4 +402,23 @@ module.exports = {
 
         return false
     },
+
+    async ITERATE(source, opts, state, idx) {
+        const actions = await source.eventConfig.actions.slice(idx + 1)
+
+        source.eventConfig.actions = actions
+
+        opts.getRaw('list').forEach(element, i, arr => {
+            const placeholders = {
+                $index: i,
+                $elem: element,
+                $list: arr.join(', '),
+                $listRaw: arr
+            }
+            //source.channel.send(replacePlaceholders(opts.getText('text'), placeholders))
+            state.executeActionChain(actions, source) 
+        });
+
+        return false
+    },
 }
